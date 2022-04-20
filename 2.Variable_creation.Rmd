@@ -1,0 +1,2821 @@
+---
+title: "2. Variable creation"
+author: "Helena Davies"
+date: "20/08/2021"
+output: html_document
+---
+
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = '',
+  prompt = FALSE,
+  cache = FALSE
+  )
+```
+
+Clear global environment prior to initiation
+```{r Clear global environment}
+remove(list = ls())
+```
+
+Read in file with path to data channel
+```{r Read in file with path to data channel on teams}
+source(file = "../credentials/paths.R")
+```
+
+Add the add_numeric function - used to convert character variables into numeric variables
+Add the remove_duplicates function - used to deduplicate and remove NAs from IDs
+Add the sumscores function - used to generate sumscores
+Add the package_check function - used to install and load dependencies
+Add the imp_check function - used to check variables for implausible values
+```{r Read in functions}
+source(file = paste0(filepath_functions, "add_numeric.R"))
+source(file = paste0(filepath_functions, "remove_duplicates.R"))
+source(file = paste0(filepath_functions, "package_check.R"))
+source("./functions.R")
+```
+
+Use package_check to install and load dependencies
+Load tidyverse last
+```{r Install load dependencies}
+packages <- c("summarytools", "sjlabelled", "Amelia", "gtsummary", "tidyverse")
+package_check(packages)
+```
+
+Retrieve recent date
+We are using the recent date to save files with paste0() as an extension to not overwrite old versions
+```{r Recent date}
+date <- Sys.Date()
+date
+```
+# Read in merged
+```{r read in merged data}
+dat <- readRDS(file = paste0("../data/dat_merged_2022-03-15.rds"))
+dim(dat) # 97,387 people
+colnames(dat)
+```
+
+First, drop the one of the pair of IDs (as decided in script 1a.GLAD_EDGI_duplicates) of people who took part twice. We have decided to keep people if they have ED100K data from EDGI. If not, then we will keep their GLAD data if they have GLAD COPING ED100K data or GLAD signup ED100K data. For those with none, we have kept their EDGI data (likely these people haven't finished any/many questionnaires).
+```{r drop one ID for those who in both EDGI and GLAD}
+# Read in data with IDs to drop
+IDs_to_drop <- readRDS(file = paste0("../data/GLAD_EDGI_IDs_to_drop_dat_2021-11-30.rds"))
+dim(IDs_to_drop)
+colnames(IDs_to_drop)
+
+length(unique(IDs_to_drop$GLAD_EDGI_IDs_to_drop)) # 861 unique IDs
+
+# Only keep IDs that are NOT in these data
+dat <- dat %>%
+  filter(ID %!in% IDs_to_drop$GLAD_EDGI_IDs_to_drop)
+
+# Check that 881 data points were dropped (these people remain in the data set as they were duplicates)
+dim(dat) # 471 IDs dropped (remaining 410 must not form part of the data that I have merged together for my final dataset)
+```
+
+# Eating disorder diagnosis 
+```{r eating disorder diagnosis}
+# Anorexia binge-eating/purging
+dat <- dat %>%
+  mutate(anorexia_nervosa_binge_purge =
+           case_when(ed.DSM5_AN_binge_purge_binary_numeric == 1 |
+                      ed.DSM5_AN_binge_purge_binary_numeric_cop == 1 |
+                      an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging" ~ 1
+                      # Not in the mhd
+                     )
+   
+         )
+
+# Check
+dat %>%
+  freq(anorexia_nervosa_binge_purge)
+
+# Anorexia binge eating only
+dat <- dat %>%
+  mutate(anorexia_nervosa_binge_only =
+           case_when(ed.DSM5_AN_binge_only_binary_numeric == 1 |
+                      ed.DSM5_AN_binge_only_binary_numeric_cop == 1 ~ 1
+                     )
+   
+         )
+
+# Check
+dat %>%
+  freq(anorexia_nervosa_binge_only)
+
+# Anorexia purging only
+dat <- dat %>%
+  mutate(anorexia_nervosa_purge_only =
+           case_when(ed.DSM5_AN_purge_only_binary_numeric == 1 |
+                      ed.DSM5_AN_purge_only_binary_numeric_cop == 1 ~ 1
+                     )
+   
+         )
+
+# Check
+dat %>%
+  freq(anorexia_nervosa_purge_only)
+
+# Bulimia nervosa
+dat <- dat %>%
+  mutate(bulimia_nervosa =
+           case_when(ed.DSM5_BN_binary_numeric == 1 |
+                       ed.DSM5_BN_binary_numeric_cop == 1 |
+                       an.1.bulimia_nervosa_numeric == 1 |
+                       mhd.bn_cop_numeric == 1 |
+                       mhd.bn_numeric == 1 ~ 1
+                     )
+         )
+
+# Check
+dat %>%
+  freq(bulimia_nervosa)
+
+# Binge-eating disorder
+dat <- dat %>%
+  mutate(binge_eating_disorder =
+           case_when(ed.DSM5_BED_binary_numeric == 1 |
+                       ed.DSM5_BED_binary_numeric_cop == 1 |
+                       an.1.bingeeating_disorder_numeric == 1 |
+                       mhd.bed_cop_numeric == 1 |
+                       mhd.bed_numeric == 1 ~ 1
+                     )
+         )
+
+
+# Check
+dat %>%
+  freq(binge_eating_disorder)
+
+# 'Pure' binge-eating disorder
+dat <- dat %>%
+  mutate(pure_binge_eating_disorder =
+           case_when( 
+             binge_eating_disorder == 1 &
+             is.na(bulimia_nervosa) &
+             is.na(anorexia_nervosa_binge_purge) ~ 1
+             )
+  )
+
+# Check
+dat %>%
+  freq(pure_binge_eating_disorder)
+            
+# 'Pure' bulimia
+dat <- dat %>%
+  mutate(pure_bulimia_nervosa =
+           case_when( 
+             bulimia_nervosa == 1 &
+             is.na(binge_eating_disorder) &
+             is.na(anorexia_nervosa_binge_purge) ~ 1
+             )
+  )
+
+# Check
+dat %>%
+  freq(pure_bulimia_nervosa)
+     
+# 'Pure' anorexia binge-eating/purging 
+dat <- dat %>%
+  mutate(pure_anorexia_nervosa_binge_purge =
+           case_when( 
+             anorexia_nervosa_binge_purge == 1 &
+             is.na(binge_eating_disorder) &
+             is.na(bulimia_nervosa) ~ 1
+             )
+  )
+
+# Check
+dat %>%
+  freq(pure_anorexia_nervosa_binge_purge)
+```
+
+For Descriptives: Self-reported eating disorder diagnosis versus DSM-5 algorithm-derived diagnosis 
+```{r descriptives}
+# Self-report: Anorexia binge-eating/purging
+dat <- dat %>%
+  mutate(anorexia_nervosa_binge_purge_self_report =
+           case_when( an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging" ~ 1
+               )
+         )
+
+# Check
+dat %>%
+  freq(anorexia_nervosa_binge_purge_self_report)
+
+# Algorithm-derived: Anorexia binge-eating/purging
+dat <- dat %>%
+  mutate(anorexia_nervosa_binge_purge_algorithm_derived =
+           case_when(ed.DSM5_AN_binge_purge_binary_numeric == 1 |
+                      ed.DSM5_AN_binge_purge_binary_numeric_cop == 1  ~ 1
+                     
+                     )
+         )
+
+# Check
+dat %>%
+  freq(anorexia_nervosa_binge_purge_algorithm_derived)
+
+# Self-report: Bulimia nervosa
+dat <- dat %>%
+  mutate(bulimia_nervosa_self_report =
+           case_when(an.1.bulimia_nervosa_numeric == 1 |
+                       mhd.bn_cop_numeric == 1 |
+                       mhd.bn_numeric == 1 ~ 1
+                     )
+         )
+
+# Check
+dat %>%
+  freq(bulimia_nervosa_self_report)
+
+
+# Algorithm-derived: Bulimia nervosa
+dat <- dat %>%
+  mutate(bulimia_nervosa_algorithm_derived =
+           case_when(ed.DSM5_BN_binary_numeric == 1 |
+                       ed.DSM5_BN_binary_numeric_cop == 1~ 1
+                     )
+         )
+
+# Check
+dat %>%
+  freq(bulimia_nervosa_algorithm_derived)
+
+
+# Self-report: Binge-eating disorder
+dat <- dat %>%
+  mutate(binge_eating_disorder_self_report =
+           case_when(an.1.bingeeating_disorder_numeric == 1 |
+                       mhd.bed_cop_numeric == 1 |
+                       mhd.bed_numeric == 1 ~ 1
+                     )
+         )
+
+# Check
+dat %>%
+  freq(binge_eating_disorder_self_report)
+
+# Algorithm-derived: Binge-eating disorder
+dat <- dat %>%
+  mutate(binge_eating_disorder_algorithm_derived =
+           case_when(ed.DSM5_BED_binary_numeric == 1 |
+                       ed.DSM5_BED_binary_numeric_cop == 1 ~ 1
+                     )
+         )
+```
+
+Hierarchical categorisation of eating disorder diagnoses
+```{r hierarchical categorisation}
+# Hierarchical categorisation
+dat <- dat %>%
+  mutate(ED_hierarchical =
+           case_when(anorexia_nervosa_binge_purge == 1 ~ "Anorexia binge-eating/purging",
+                     bulimia_nervosa == 1 ~ "Bulimia nervosa",
+                     binge_eating_disorder == 1 ~ "Binge-eating disorder"
+                     )
+         )
+
+# Check
+dat %>%
+  freq(ED_hierarchical)
+
+# Hierarchical categorisation numeric
+dat <- dat %>%
+  mutate(ED_hierarchical_numeric =
+           case_when(ED_hierarchical == "Anorexia binge-eating/purging" ~ 2,
+                     ED_hierarchical == "Bulimia nervosa" ~ 1,
+                     ED_hierarchical == "Binge-eating disorder" ~ 0
+                     )
+         )
+
+# Check
+dat %>%
+  freq(ED_hierarchical_numeric)
+
+# Hierarchical categorisation: sensitivity analysis
+dat <- dat %>%
+  mutate(ED_hierarchical_sens_ANB =
+           case_when(anorexia_nervosa_binge_only == 1 ~ "Anorexia binge eating only",
+                     bulimia_nervosa == 1 ~ "Bulimia nervosa",
+                     binge_eating_disorder == 1 ~ "Binge-eating disorder"
+                     )
+         )
+
+# Check
+dat %>%
+  freq(ED_hierarchical_sens_ANB)
+
+# Hierarchical categorisation numeric: sensitivity analysis
+dat <- dat %>%
+  mutate(ED_hierarchical_sens_ANB_numeric =
+           case_when(ED_hierarchical == "Anorexia binge eating only" ~ 2,
+                     ED_hierarchical == "Bulimia nervosa" ~ 1,
+                     ED_hierarchical == "Binge-eating disorder" ~ 0
+                     )
+         )
+
+# Check
+dat %>%
+  freq(ED_hierarchical_sens_ANB_numeric)
+```
+
+# Binge eating
+NB: Here, we  need to identify those who do NOT have lifetime BE because we are comparing those with BE to those without BE.
+```{r binge eating}
+# Binge eating 
+dat <- dat %>%
+  mutate(binge_eating_with_loss_control = 
+           case_when(
+             
+             # Binge eating reported in ED100K (GLAD, EDGI)
+             (binge_eating == "Yes" &
+               (loss_of_control == "Slightly" |
+                loss_of_control == "Somewhat" |
+                loss_of_control == "Very" |
+                loss_of_control == "Extremely")) |
+               
+             # Binge eating reported in COPING ED100K (NBR, GLAD COPING, EDGI COPING)
+               (binge_eating_cop == "Yes" &
+               (loss_of_control_cop == "Slightly" |
+                loss_of_control_cop == "Somewhat" |
+                loss_of_control_cop == "Very" |
+                  loss_of_control_cop == "Extremely")) |
+                
+               # Any diagnosis that includes binge eating with loss of control
+               (binge_eating_disorder == 1 |
+               bulimia_nervosa == 1 |
+               anorexia_nervosa_binge_purge == 1) ~ "BE loss control", 
+            
+               ((binge_eating == "Yes" &
+                 loss_of_control == "No") | 
+                  
+                (binge_eating_cop == "Yes" &
+                loss_of_control_cop == "No")) ~ "BE no loss control",
+            
+              binge_eating == "No" |
+              binge_eating_cop == "No" ~ "No BE"
+             )
+         )
+
+# Check 
+dat %>%
+  freq(binge_eating_with_loss_control)
+
+# Binge eating numeric
+dat <- dat %>%
+  mutate(binge_eating_with_loss_control_numeric = 
+           case_when(binge_eating_with_loss_control == "BE loss control" ~ 1,
+                     binge_eating_with_loss_control == "BE no loss control" ~ 2,
+                     binge_eating_with_loss_control == "No BE" ~ 0
+         )
+  )
+
+# Check 
+dat %>%
+  freq(binge_eating_with_loss_control_numeric)
+
+# Check Ns with missing data at symptom level
+dat %>%
+  freq(binge_eating_with_loss_control_numeric)
+```
+
+# Create single variable of sex (does not change)
+```{r single variables sex}
+dat <- dat %>%
+  mutate(sex_final =
+           case_when(
+             !is.na(sex) ~ sex,
+             
+              TRUE ~ sex_cop
+           ))
+
+dat <- dat %>%
+  mutate(sex_final_numeric =
+           case_when(
+             !is.na(sex_numeric) ~ sex_numeric,
+             
+              TRUE ~ sex_cop_numeric
+           ))
+
+# Check
+dat %>%
+  freq(sex_final)
+```
+                                        
+# Create single variable of ethnicity (does not change) and make it binary
+```{r single variable and binary ethnicity}
+# Check
+dat %>%
+  freq(ethnicity)
+
+# Numeric version
+dat <- dat %>%
+  mutate(racially_minoritised_numeric =
+           case_when(
+             ethnicity == "White" |
+               ethnicity == "White, white European or Caucasian" ~ 0,
+             
+             is.na(ethnicity) |
+             ethnicity == "Don't know" |
+             ethnicity == "Prefer not to answer" |
+             ethnicity == "Seen but not answered" |
+             ethnicity == "Prefer not to say"   ~ NA_real_,
+             
+             TRUE ~ 1
+             
+           ))
+
+# Check
+dat %>%
+  freq(racially_minoritised_numeric)
+
+# Character version
+dat <- dat %>%
+  mutate(racially_minoritised =
+           case_when(
+             ethnicity == "White" |
+               ethnicity == "White, white European or Caucasian" ~ "No",
+             
+             is.na(ethnicity) |
+             ethnicity == "Don't know" |
+             ethnicity == "Prefer not to answer" |
+             ethnicity == "Seen but not answered" |
+             ethnicity == "Prefer not to say"   ~ NA_character_,
+             
+             TRUE ~ "Yes"
+             
+           ))
+
+# Check
+dat %>%
+  freq(racially_minoritised)
+```
+
+# Select relevant variables (for variables that can change)
+## First, depending on diagnosis
+NB: We will lose people who took part in EDGI or GLAD sign-up but did not meet criteria for one of the EDs specified and then also did not take part in COPING. However, this is fine because we are comparing across ANBP, BED, and BN (and therefore people who do not fit one of these diagnoses would be dropped anyway). The 'TRUE' is assigning EVERYONE else their variable at COPING, however we will only end up keeping the participants who also then met diagnostic criteria in COPING for one of these disorders.
+
+Amendment 14/12/21: For people who are missing COPING data on a variable, e.g,. age, but have got COPING data on binge eating, I have now added a line of code so that they are assigned their variable data from GLAD/EDGI. This is because I noticed there were 78 people with diagnostic-level data (i.e., a diagnosis of ANBP, BN, or BED obtained from COPING data) but who had been dropped because they hadn't filled in the mania symptom questionnaire in COPING. We want to keep these people and will just have to use their data from GLAD/EDGI.
+```{r selection of variables depending on when diagnosis received}
+dat <- dat %>%
+  mutate(binge_eating_disorder_timing = 
+           case_when(
+             
+             # GLAD or EDGI sign-up
+             # Binge-type eating disorder reported in ED100K (GLAD, EDGI). 
+             (ed.DSM5_AN_binge_purge_binary_numeric == 1 | 
+                ed.DSM5_BN_binary_numeric == 1 | 
+                ed.DSM5_BED_binary_numeric == 1 |
+                an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging" |
+                an.1.bulimia_nervosa_numeric == 1 |
+                mhd.bn_numeric == 1 |
+                an.1.bingeeating_disorder == 1 |
+                mhd.bed_numeric == 1) ~ "BE disorder at sign-up", # The only people we need to assign different variables for are people who met criteria at GLAD or EDGI sign-up FIRST. Otherwise, for everyone else, we will use their variables at COPING (if available, otherwise will use GLAD/EDGI). 
+             
+             )
+           )
+
+# Check 
+dat %>%
+  freq(binge_eating_disorder_timing)
+
+# BMI signup
+dat <- dat %>%
+  mutate(bmi_signup_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(dem.bmi_signup) ~ dem.bmi_signup, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(dem.bmi_signup_cop) ~ dem.bmi_signup_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(dem.bmi_signup) &
+               !is.na(dem.bmi_signup_cop) ~ dem.bmi_signup_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(dem.bmi_signup_cop) &
+               !is.na(dem.bmi_signup) ~ dem.bmi_signup # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(bmi_signup_dx_level)) %>%
+  freq(dem.bmi_signup_cop)
+
+dat %>%
+  filter(is.na(bmi_signup_dx_level)) %>%
+  freq(dem.bmi_signup)
+
+# Lowest BMI (would rather lowest BMI at ANY height [dem.bmi_an_lowest/dem.bmi_an_lowest_cop], than their lowest BMI at adult height if poss [dem.bmi_lowest/dem.bmi_lowest_cop])
+dat <- dat %>%
+  mutate(bmi_lowest_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(an.bmi_lowest) ~ an.bmi_lowest, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data (most desirable)
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" &   
+             !is.na(dem.bmi_lowest) ~ dem.bmi_lowest, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data (second desirable)
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(an.bmi_lowest_cop) ~ an.bmi_lowest_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data (most desirable)
+             
+              is.na(binge_eating_disorder_timing) & 
+               !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data (second desirable)
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(an.bmi_lowest) & 
+               !is.na(dem.bmi_lowest) ~ dem.bmi_lowest, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data (missing most desirable)
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(dem.bmi_lowest) &
+               !is.na(an.bmi_lowest_cop) ~ an.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data (missing second most desirable)
+             
+              binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(an.bmi_lowest_cop) &
+               !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(an.bmi_lowest_cop) &
+               !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop, # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             is.na(binge_eating_disorder_timing) & 
+               is.na(dem.bmi_lowest_cop) &
+               !is.na(an.bmi_lowest) ~ an.bmi_lowest, # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              is.na(binge_eating_disorder_timing) & 
+               is.na(an.bmi_lowest) &
+               !is.na(dem.bmi_lowest) ~ dem.bmi_lowest # People with no GLAD/EDGI BE data but missing for COPING variable data
+            )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(bmi_lowest_dx_level)) %>%
+  freq(an.bmi_lowest)
+
+dat %>%
+  filter(is.na(bmi_lowest_dx_level)) %>%
+  freq(dem.bmi_lowest)
+
+dat %>%
+  filter(is.na(bmi_lowest_dx_level)) %>%
+  freq(an.bmi_lowest_cop)
+
+dat %>%
+  filter(is.na(bmi_lowest_dx_level)) %>%
+  freq(dem.bmi_lowest_cop)
+
+
+# Highest BMI
+dat <- dat %>%
+  mutate(bmi_highest_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(dem.bmi_highest) ~ dem.bmi_highest, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(dem.bmi_highest_cop) ~ dem.bmi_highest_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(dem.bmi_highest) &
+               !is.na(dem.bmi_highest_cop) ~ dem.bmi_highest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(dem.bmi_highest_cop) &
+               !is.na(dem.bmi_highest) ~ dem.bmi_highest # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(bmi_highest_dx_level)) %>%
+  freq(dem.bmi_highest)
+
+dat %>%
+  filter(is.na(bmi_highest_dx_level)) %>%
+  freq(dem.bmi_highest_cop)
+
+
+# Highest education
+dat <- dat %>%
+  mutate(highest_education_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(dem.highest_education_collapsed) ~ dem.highest_education_collapsed, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+             !is.na(employ.highest_education_collapsed_cop) ~ employ.highest_education_collapsed_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(dem.highest_education_collapsed) &
+               !is.na(employ.highest_education_collapsed_cop) ~ employ.highest_education_collapsed_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(employ.highest_education_collapsed_cop) &
+               !is.na(dem.highest_education_collapsed) ~ dem.highest_education_collapsed # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(highest_education_dx_level)) %>%
+  freq(dem.highest_education_collapsed)
+
+dat %>%
+  filter(is.na(highest_education_dx_level)) %>%
+  freq(employ.highest_education_collapsed_cop)
+
+# Gender
+dat <- dat %>%
+  mutate(gender_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(gender) ~ gender, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(gender_cop) ~ gender_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(gender) &
+               !is.na(gender_cop) ~ gender_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(gender_cop) &
+               !is.na(gender) ~ gender # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(gender_dx_level)) %>%
+  freq(gender)
+
+dat %>%
+  filter(is.na(gender_dx_level)) %>%
+  freq(gender_cop)
+
+# Age
+dat <- dat %>%
+  mutate(age_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(dem.dob_age) ~ dem.dob_age, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+              binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             is.na(dem.dob_age) &
+               !is.na(selfreported_age) ~ selfreported_age, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+            
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(dem.dob_age_cop) ~ dem.dob_age_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+              is.na(dem.dob_age_cop) &
+             !is.na(dem.age_category_cop)  ~ as.numeric(dem.age_category_cop),  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(dem.dob_age) &
+               is.na(selfreported_age) &
+               !is.na(dem.dob_age_cop) ~ dem.dob_age_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(dem.dob_age) &
+               is.na(selfreported_age) &
+               is.na(dem.dob_age_cop) &
+              !is.na(dem.age_category_cop) ~ as.numeric(dem.age_category_cop), # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+            is.na(binge_eating_disorder_timing) & 
+               is.na(dem.dob_age_cop) &
+               is.na(dem.age_category_cop) &
+               !is.na(dem.dob_age) ~ dem.dob_age, # People with no GLAD/EDGI BE data but missing for COPING variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               is.na(dem.dob_age_cop) &
+               is.na(dem.age_category_cop) &
+               is.na(dem.dob_age) &
+              !is.na(selfreported_age) ~ selfreported_age # People with GLAD/EDGI BE data but missing for COPING variable data
+             
+               
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(age_dx_level)) %>%
+  freq(dem.dob_age)
+
+dat %>%
+  filter(is.na(age_dx_level)) %>%
+  freq(dem.dob_age_cop)
+
+dat %>%
+  filter(is.na(age_dx_level)) %>%
+  freq(selfreported_age)
+
+dat %>%
+  filter(is.na(age_dx_level)) %>%
+  freq(dem.age_category_cop)
+
+
+# More hyperactive
+dat <- dat %>%
+  mutate(more_hyperactivity_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.hyper_normal_people_thought.1_numeric) ~ mdq.hyper_normal_people_thought.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.hyper_normal_people_thought.1_cop_numeric) ~ mdq.hyper_normal_people_thought.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.hyper_normal_people_thought.1_numeric) &
+               !is.na(mdq.hyper_normal_people_thought.1_cop_numeric) ~ mdq.hyper_normal_people_thought.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.hyper_normal_people_thought.1_cop_numeric) &
+               !is.na(mdq.hyper_normal_people_thought.1_numeric) ~ mdq.hyper_normal_people_thought.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_hyperactivity_dx_level =
+           recode_factor(more_hyperactivity_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_hyperactivity_dx_level)) %>%
+  freq(mdq.hyper_normal_people_thought.1_numeric)
+
+dat %>%
+  filter(is.na(more_hyperactivity_dx_level)) %>%
+  freq(mdq.hyper_normal_people_thought.1_cop_numeric)
+
+
+# More irritability
+dat <- dat %>%
+  mutate(more_irritability_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.start_fights_shouted_arguments.1_numeric) ~ mdq.start_fights_shouted_arguments.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.start_fights_shouted_arguments.1_cop_numeric) ~ mdq.start_fights_shouted_arguments.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.start_fights_shouted_arguments.1_numeric) &
+               !is.na(mdq.start_fights_shouted_arguments.1_cop_numeric) ~ mdq.start_fights_shouted_arguments.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.start_fights_shouted_arguments.1_cop_numeric) &
+               !is.na(mdq.start_fights_shouted_arguments.1_numeric) ~ mdq.start_fights_shouted_arguments.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_irritability_dx_level =
+           recode_factor(more_irritability_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_irritability_dx_level)) %>%
+  freq(mdq.start_fights_shouted_arguments.1_numeric)
+
+dat %>%
+  filter(is.na(more_irritability_dx_level)) %>%
+  freq(mdq.start_fights_shouted_arguments.1_cop_numeric)
+
+# More self-confidence
+dat <- dat %>%
+  mutate(more_self_confidence_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.usual_felt_selfconfident.1_numeric) ~ mdq.usual_felt_selfconfident.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.usual_felt_selfconfident.1_cop_numeric) ~ mdq.usual_felt_selfconfident.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.usual_felt_selfconfident.1_numeric) &
+               !is.na(mdq.usual_felt_selfconfident.1_cop_numeric) ~ mdq.usual_felt_selfconfident.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.usual_felt_selfconfident.1_cop_numeric) &
+               !is.na(mdq.usual_felt_selfconfident.1_numeric) ~ mdq.usual_felt_selfconfident.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_self_confidence_dx_level =
+           recode_factor(more_self_confidence_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_self_confidence_dx_level)) %>%
+  freq(mdq.usual_felt_selfconfident.1_numeric)
+
+dat %>%
+  filter(is.na(more_self_confidence_dx_level)) %>%
+  freq(mdq.usual_felt_selfconfident.1_cop_numeric)
+
+
+# Less sleep
+dat <- dat %>%
+  mutate(less_sleep_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.miss_found_sleep_usual.1_numeric) ~ mdq.miss_found_sleep_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.miss_found_sleep_usual.1_cop_numeric) ~ mdq.miss_found_sleep_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.miss_found_sleep_usual.1_numeric) &
+               !is.na(mdq.miss_found_sleep_usual.1_cop_numeric) ~ mdq.miss_found_sleep_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.miss_found_sleep_usual.1_cop_numeric) &
+               !is.na(mdq.miss_found_sleep_usual.1_numeric) ~ mdq.miss_found_sleep_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(less_sleep_dx_level =
+           recode_factor(less_sleep_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(less_sleep_dx_level)) %>%
+  freq(mdq.miss_found_sleep_usual.1_numeric)
+
+dat %>%
+  filter(is.na(less_sleep_dx_level)) %>%
+  freq(mdq.miss_found_sleep_usual.1_cop_numeric)
+
+# More talkative
+dat <- dat %>%
+  mutate(more_talkative_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.faster_spoke_talkative_usual.1_numeric) ~ mdq.faster_spoke_talkative_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.faster_spoke_talkative_usual.1_cop_numeric) ~ mdq.faster_spoke_talkative_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.faster_spoke_talkative_usual.1_numeric) &
+               !is.na(mdq.faster_spoke_talkative_usual.1_cop_numeric) ~ mdq.faster_spoke_talkative_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.faster_spoke_talkative_usual.1_cop_numeric) &
+               !is.na(mdq.faster_spoke_talkative_usual.1_numeric) ~ mdq.faster_spoke_talkative_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_talkative_dx_level =
+           recode_factor(more_talkative_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_talkative_dx_level)) %>%
+  freq(mdq.faster_spoke_talkative_usual.1_numeric)
+
+dat %>%
+  filter(is.na(more_talkative_dx_level)) %>%
+  freq(mdq.faster_spoke_talkative_usual.1_cop_numeric)
+
+
+# Racing thoughts
+dat <- dat %>%
+  mutate(racing_thoughts_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.head_mind_couldnt_slow.1_numeric) ~ mdq.head_mind_couldnt_slow.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.head_mind_couldnt_slow.1_cop_numeric) ~ mdq.head_mind_couldnt_slow.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.head_mind_couldnt_slow.1_numeric) &
+               !is.na(mdq.head_mind_couldnt_slow.1_cop_numeric) ~ mdq.head_mind_couldnt_slow.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.head_mind_couldnt_slow.1_cop_numeric) &
+               !is.na(mdq.head_mind_couldnt_slow.1_numeric) ~ mdq.head_mind_couldnt_slow.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(racing_thoughts_dx_level =
+           recode_factor(racing_thoughts_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(racing_thoughts_dx_level)) %>%
+  freq(mdq.head_mind_couldnt_slow.1_numeric)
+
+dat %>%
+  filter(is.na(racing_thoughts_dx_level)) %>%
+  freq(mdq.head_mind_couldnt_slow.1_cop_numeric)
+
+
+# Concentration difficulties
+dat <- dat %>%
+  mutate(conc_difficulties_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.staying_track_trouble_concentrating.1_numeric) ~ mdq.staying_track_trouble_concentrating.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.staying_track_trouble_concentrating.1_cop_numeric) ~ mdq.staying_track_trouble_concentrating.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.staying_track_trouble_concentrating.1_numeric) &
+               !is.na(mdq.staying_track_trouble_concentrating.1_cop_numeric) ~ mdq.staying_track_trouble_concentrating.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.staying_track_trouble_concentrating.1_cop_numeric) &
+               !is.na(mdq.staying_track_trouble_concentrating.1_numeric) ~ mdq.staying_track_trouble_concentrating.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(conc_difficulties_dx_level =
+           recode_factor(conc_difficulties_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(conc_difficulties_dx_level)) %>%
+  freq(mdq.staying_track_trouble_concentrating.1_numeric)
+
+dat %>%
+  filter(is.na(conc_difficulties_dx_level)) %>%
+  freq(mdq.staying_track_trouble_concentrating.1_cop_numeric)
+
+# More energy
+dat <- dat %>%
+  mutate(more_energy_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.you_had_much_more_energy_than_usual.1_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.you_had_much_more_energy_than_usual.1_cop_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.you_had_much_more_energy_than_usual.1_numeric) &
+               !is.na(mdq.you_had_much_more_energy_than_usual.1_cop_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.you_had_much_more_energy_than_usual.1_cop_numeric) &
+               !is.na(mdq.you_had_much_more_energy_than_usual.1_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_energy_dx_level =
+           recode_factor(more_energy_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_energy_dx_level)) %>%
+  freq(mdq.you_had_much_more_energy_than_usual.1_numeric)
+
+dat %>%
+  filter(is.na(more_energy_dx_level)) %>%
+  freq(mdq.you_had_much_more_energy_than_usual.1_cop_numeric)
+
+
+# More active
+dat <- dat %>%
+  mutate(more_active_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.active_usual_things.1_numeric) ~ mdq.active_usual_things.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.active_usual_things.1_cop_numeric) ~ mdq.active_usual_things.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.active_usual_things.1_numeric) &
+               !is.na(mdq.active_usual_things.1_cop_numeric) ~ mdq.active_usual_things.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.active_usual_things.1_cop_numeric) &
+               !is.na(mdq.active_usual_things.1_numeric) ~ mdq.active_usual_things.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_active_dx_level =
+           recode_factor(more_active_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_active_dx_level)) %>%
+  freq(mdq.active_usual_things.1_numeric)
+
+dat %>%
+  filter(is.na(more_active_dx_level)) %>%
+  freq(mdq.active_usual_things.1_cop_numeric)
+
+
+# More social
+dat <- dat %>%
+  mutate(more_social_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.outgoing_middle_night_usual.1_numeric) ~ mdq.outgoing_middle_night_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.outgoing_middle_night_usual.1_cop_numeric) ~ mdq.outgoing_middle_night_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.outgoing_middle_night_usual.1_numeric) &
+               !is.na(mdq.outgoing_middle_night_usual.1_cop_numeric) ~ mdq.outgoing_middle_night_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.outgoing_middle_night_usual.1_cop_numeric) &
+               !is.na(mdq.outgoing_middle_night_usual.1_numeric) ~ mdq.outgoing_middle_night_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_social_dx_level =
+           recode_factor(more_social_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_social_dx_level)) %>%
+  freq(mdq.outgoing_middle_night_usual.1_numeric)
+
+dat %>%
+  filter(is.na(more_social_dx_level)) %>%
+  freq(mdq.outgoing_middle_night_usual.1_cop_numeric)
+
+
+# Higher libido
+dat <- dat %>%
+  mutate(higher_libido_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.interested_sex_usual.1_numeric) ~ mdq.interested_sex_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.interested_sex_usual.1_cop_numeric) ~ mdq.interested_sex_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.interested_sex_usual.1_numeric) &
+               !is.na(mdq.interested_sex_usual.1_cop_numeric) ~ mdq.interested_sex_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.interested_sex_usual.1_cop_numeric) &
+               !is.na(mdq.interested_sex_usual.1_numeric) ~ mdq.interested_sex_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(higher_libido_dx_level =
+           recode_factor(higher_libido_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(higher_libido_dx_level)) %>%
+  freq(mdq.interested_sex_usual.1_numeric)
+
+dat %>%
+  filter(is.na(higher_libido_dx_level)) %>%
+  freq(mdq.interested_sex_usual.1_cop_numeric)
+
+
+# More risky/unusual behaviour
+dat <- dat %>%
+  mutate(more_risky_beh_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.excessive_foolish_risky_unusual.1_numeric) ~ mdq.excessive_foolish_risky_unusual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.excessive_foolish_risky_unusual.1_cop_numeric) ~ mdq.excessive_foolish_risky_unusual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.excessive_foolish_risky_unusual.1_numeric) &
+               !is.na(mdq.excessive_foolish_risky_unusual.1_cop_numeric) ~ mdq.excessive_foolish_risky_unusual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.excessive_foolish_risky_unusual.1_cop_numeric) &
+               !is.na(mdq.excessive_foolish_risky_unusual.1_numeric) ~ mdq.excessive_foolish_risky_unusual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_risky_beh_dx_level =
+           recode_factor(more_risky_beh_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_risky_beh_dx_level)) %>%
+  freq(mdq.excessive_foolish_risky_unusual.1_numeric)
+
+dat %>%
+  filter(is.na(more_risky_beh_dx_level)) %>%
+  freq(mdq.excessive_foolish_risky_unusual.1_cop_numeric)
+
+# Reckless spending
+dat <- dat %>%
+  mutate(reckless_spending_numeric_dx_level = 
+           case_when(
+             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             !is.na(mdq.trouble_family_spending_money.1_numeric) ~ mdq.trouble_family_spending_money.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_disorder_timing) & 
+               !is.na(mdq.trouble_family_spending_money.1_cop_numeric) ~ mdq.trouble_family_spending_money.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               is.na(mdq.trouble_family_spending_money.1_numeric) &
+               !is.na(mdq.trouble_family_spending_money.1_cop_numeric) ~ mdq.trouble_family_spending_money.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_disorder_timing) & 
+               is.na(mdq.trouble_family_spending_money.1_cop_numeric) &
+               !is.na(mdq.trouble_family_spending_money.1_numeric) ~ mdq.trouble_family_spending_money.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(reckless_spending_dx_level =
+           recode_factor(reckless_spending_numeric_dx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(reckless_spending_dx_level)) %>%
+  freq(mdq.trouble_family_spending_money.1_numeric)
+
+dat %>%
+  filter(is.na(reckless_spending_dx_level)) %>%
+  freq(mdq.trouble_family_spending_money.1_cop_numeric)
+```
+
+
+## Now, depending on symptom
+NB: Because we are comparing people with BE versus those without, we need to specify to keep people even if they reported no BE in GLAD or EDGI but did not take part in COPING. If these people DID take part in COPING, their answer in COPING would take priority over their answer in GLAD/EDGI because it's more up-to-date, so regardless of their answer, we would take their variable from COPING. In contrast, for the people who reported BE in GLAD/EDGI - this is the FIRST time they have reported it and so we need to take their variable from here.
+```{r selection of variables depending on when symptom reported}
+# First, identify whether people report BE in GLAD or EDGI sign-up (if yes, need to use variables from here)
+dat <- dat %>%
+  mutate(binge_eating_timing = 
+           case_when(
+             
+             # GLAD or EDGI sign-up
+             # Binge eating reported in ED100K (GLAD, EDGI)
+             (binge_eating == "Yes" &
+               (loss_of_control == "Slightly" |
+                loss_of_control == "Somewhat" |
+                loss_of_control == "Very" |
+                loss_of_control == "Extremely")) |
+               
+              # Fulfilled criteria for binge-type ED in GLAD or EDGI sign-up
+               (ed.DSM5_AN_binge_purge_binary_numeric == 1 |
+               an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging" |
+               ed.DSM5_BN_binary_numeric == 1 |
+               an.1.bulimia_nervosa_numeric == 1 |
+               mhd.bn_numeric == 1 |
+               ed.DSM5_BED_binary_numeric == 1 |
+               an.1.bingeeating_disorder == 1 |
+               mhd.bed_numeric == 1) ~ "BE at sign-up", # The only people we need to assign different variables for are people who met criteria at GLAD or EDGI sign-up FIRST. Otherwise, for everyone else, we will use their variables at COPING (if available). 
+             
+             # No binge eating reported in GLAD or EDGI sign-up and did not take part in COPING
+              (binge_eating == "No" &
+               is.na(binge_eating_cop)) ~ "BE at sign-up" # We want to keep these people and use their variables at GLAD or EDGI sign-up
+            )
+           )
+
+# Check 
+dat %>%
+  freq(binge_eating_timing)
+
+# BMI signup
+dat <- dat %>%
+  mutate(bmi_signup_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(dem.bmi_signup) ~ dem.bmi_signup, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(dem.bmi_signup_cop) ~ dem.bmi_signup_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(dem.bmi_signup) &
+               !is.na(dem.bmi_signup_cop) ~ dem.bmi_signup_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(dem.bmi_signup_cop) &
+               !is.na(dem.bmi_signup) ~ dem.bmi_signup # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(bmi_signup_sx_level)) %>%
+  freq(dem.bmi_signup_cop)
+
+dat %>%
+  filter(is.na(bmi_signup_sx_level)) %>%
+  freq(dem.bmi_signup)
+
+# Lowest BMI (would rather lowest BMI at ANY height [dem.bmi_an_lowest/dem.bmi_an_lowest_cop], than their lowest BMI at adult height if poss [dem.bmi_lowest/dem.bmi_lowest_cop])
+dat <- dat %>%
+  mutate(bmi_lowest_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(an.bmi_lowest) ~ an.bmi_lowest, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data (most desirable)
+             
+             binge_eating_timing == "BE at sign-up" &   
+             !is.na(dem.bmi_lowest) ~ dem.bmi_lowest, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data (second desirable)
+             
+             is.na(binge_eating_timing) & 
+               !is.na(an.bmi_lowest_cop) ~ an.bmi_lowest_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data (most desirable)
+             
+              is.na(binge_eating_timing) & 
+               !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data (second desirable)
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(an.bmi_lowest) & 
+               !is.na(dem.bmi_lowest) ~ dem.bmi_lowest, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data (missing most desirable)
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(dem.bmi_lowest) &
+               !is.na(an.bmi_lowest_cop) ~ an.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data (missing second most desirable)
+             
+              binge_eating_timing == "BE at sign-up" & 
+               is.na(an.bmi_lowest_cop) &
+               !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(an.bmi_lowest_cop) &
+               !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop, # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             is.na(binge_eating_timing) & 
+               is.na(dem.bmi_lowest_cop) &
+               !is.na(an.bmi_lowest) ~ an.bmi_lowest, # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              is.na(binge_eating_timing) & 
+               is.na(an.bmi_lowest) &
+               !is.na(dem.bmi_lowest) ~ dem.bmi_lowest # People with no GLAD/EDGI BE data but missing for COPING variable data
+            )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(bmi_lowest_sx_level)) %>%
+  freq(an.bmi_lowest)
+
+dat %>%
+  filter(is.na(bmi_lowest_sx_level)) %>%
+  freq(dem.bmi_lowest)
+
+dat %>%
+  filter(is.na(bmi_lowest_sx_level)) %>%
+  freq(an.bmi_lowest_cop)
+
+dat %>%
+  filter(is.na(bmi_lowest_sx_level)) %>%
+  freq(dem.bmi_lowest_cop)
+
+
+# Highest BMI
+dat <- dat %>%
+  mutate(bmi_highest_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(dem.bmi_highest) ~ dem.bmi_highest, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(dem.bmi_highest_cop) ~ dem.bmi_highest_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(dem.bmi_highest) &
+               !is.na(dem.bmi_highest_cop) ~ dem.bmi_highest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(dem.bmi_highest_cop) &
+               !is.na(dem.bmi_highest) ~ dem.bmi_highest # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(bmi_highest_sx_level)) %>%
+  freq(dem.bmi_highest)
+
+dat %>%
+  filter(is.na(bmi_highest_sx_level)) %>%
+  freq(dem.bmi_highest_cop)
+
+
+# Highest education
+dat <- dat %>%
+  mutate(highest_education_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(dem.highest_education_collapsed) ~ dem.highest_education_collapsed, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(employ.highest_education_collapsed_cop) ~ employ.highest_education_collapsed_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(dem.highest_education_collapsed) &
+               !is.na(employ.highest_education_collapsed_cop) ~ employ.highest_education_collapsed_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(employ.highest_education_collapsed_cop) &
+               !is.na(dem.highest_education_collapsed) ~ dem.highest_education_collapsed # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(highest_education_sx_level)) %>%
+  freq(dem.highest_education_collapsed)
+
+dat %>%
+  filter(is.na(highest_education_sx_level)) %>%
+  freq(employ.highest_education_collapsed_cop)
+
+# Gender
+dat <- dat %>%
+  mutate(gender_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(gender) ~ gender, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(gender_cop) ~ gender_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(gender) &
+               !is.na(gender_cop) ~ gender_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(gender_cop) &
+               !is.na(gender) ~ gender # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(gender_sx_level)) %>%
+  freq(gender)
+
+dat %>%
+  filter(is.na(gender_sx_level)) %>%
+  freq(gender_cop)
+
+# Age
+dat <- dat %>%
+  mutate(age_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(dem.dob_age) ~ dem.dob_age, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+              binge_eating_timing == "BE at sign-up" &  
+             is.na(dem.dob_age) &
+               !is.na(selfreported_age) ~ selfreported_age, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+            
+             is.na(binge_eating_timing) & 
+               !is.na(dem.dob_age_cop) ~ dem.dob_age_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             is.na(binge_eating_timing) & 
+              is.na(dem.dob_age_cop) &
+             !is.na(dem.age_category_cop)  ~ as.numeric(dem.age_category_cop),  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(dem.dob_age) &
+               is.na(selfreported_age) &
+               !is.na(dem.dob_age_cop) ~ dem.dob_age_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(dem.dob_age) &
+               is.na(selfreported_age) &
+               is.na(dem.dob_age_cop) &
+              !is.na(dem.age_category_cop) ~ as.numeric(dem.age_category_cop), # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+            is.na(binge_eating_timing) & 
+               is.na(dem.dob_age_cop) &
+               is.na(dem.age_category_cop) &
+               !is.na(dem.dob_age) ~ dem.dob_age, # People with no GLAD/EDGI BE data but missing for COPING variable data
+             
+             is.na(binge_eating_timing) & 
+               is.na(dem.dob_age_cop) &
+               is.na(dem.age_category_cop) &
+               is.na(dem.dob_age) &
+              !is.na(selfreported_age) ~ selfreported_age # People with GLAD/EDGI BE data but missing for COPING variable data
+             
+               
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(age_sx_level)) %>%
+  freq(dem.dob_age)
+
+dat %>%
+  filter(is.na(age_sx_level)) %>%
+  freq(dem.dob_age_cop)
+
+dat %>%
+  filter(is.na(age_sx_level)) %>%
+  freq(selfreported_age)
+
+dat %>%
+  filter(is.na(age_sx_level)) %>%
+  freq(dem.age_category_cop)
+
+# More hyperactive
+dat <- dat %>%
+  mutate(more_hyperactivity_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.hyper_normal_people_thought.1_numeric) ~ mdq.hyper_normal_people_thought.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.hyper_normal_people_thought.1_cop_numeric) ~ mdq.hyper_normal_people_thought.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.hyper_normal_people_thought.1_numeric) &
+               !is.na(mdq.hyper_normal_people_thought.1_cop_numeric) ~ mdq.hyper_normal_people_thought.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.hyper_normal_people_thought.1_cop_numeric) &
+               !is.na(mdq.hyper_normal_people_thought.1_numeric) ~ mdq.hyper_normal_people_thought.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_hyperactivity_sx_level =
+           recode_factor(more_hyperactivity_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_hyperactivity_sx_level)) %>%
+  freq(mdq.hyper_normal_people_thought.1_numeric)
+
+dat %>%
+  filter(is.na(more_hyperactivity_sx_level)) %>%
+  freq(mdq.hyper_normal_people_thought.1_cop_numeric)
+
+
+# More irritability
+dat <- dat %>%
+  mutate(more_irritability_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.start_fights_shouted_arguments.1_numeric) ~ mdq.start_fights_shouted_arguments.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.start_fights_shouted_arguments.1_cop_numeric) ~ mdq.start_fights_shouted_arguments.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.start_fights_shouted_arguments.1_numeric) &
+               !is.na(mdq.start_fights_shouted_arguments.1_cop_numeric) ~ mdq.start_fights_shouted_arguments.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.start_fights_shouted_arguments.1_cop_numeric) &
+               !is.na(mdq.start_fights_shouted_arguments.1_numeric) ~ mdq.start_fights_shouted_arguments.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_irritability_sx_level =
+           recode_factor(more_irritability_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_irritability_sx_level)) %>%
+  freq(mdq.start_fights_shouted_arguments.1_numeric)
+
+dat %>%
+  filter(is.na(more_irritability_sx_level)) %>%
+  freq(mdq.start_fights_shouted_arguments.1_cop_numeric)
+
+# More self-confidence
+dat <- dat %>%
+  mutate(more_self_confidence_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.usual_felt_selfconfident.1_numeric) ~ mdq.usual_felt_selfconfident.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.usual_felt_selfconfident.1_cop_numeric) ~ mdq.usual_felt_selfconfident.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.usual_felt_selfconfident.1_numeric) &
+               !is.na(mdq.usual_felt_selfconfident.1_cop_numeric) ~ mdq.usual_felt_selfconfident.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.usual_felt_selfconfident.1_cop_numeric) &
+               !is.na(mdq.usual_felt_selfconfident.1_numeric) ~ mdq.usual_felt_selfconfident.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_self_confidence_sx_level =
+           recode_factor(more_self_confidence_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_self_confidence_sx_level)) %>%
+  freq(mdq.usual_felt_selfconfident.1_numeric)
+
+dat %>%
+  filter(is.na(more_self_confidence_sx_level)) %>%
+  freq(mdq.usual_felt_selfconfident.1_cop_numeric)
+
+
+# Less sleep
+dat <- dat %>%
+  mutate(less_sleep_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.miss_found_sleep_usual.1_numeric) ~ mdq.miss_found_sleep_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.miss_found_sleep_usual.1_cop_numeric) ~ mdq.miss_found_sleep_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.miss_found_sleep_usual.1_numeric) &
+               !is.na(mdq.miss_found_sleep_usual.1_cop_numeric) ~ mdq.miss_found_sleep_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.miss_found_sleep_usual.1_cop_numeric) &
+               !is.na(mdq.miss_found_sleep_usual.1_numeric) ~ mdq.miss_found_sleep_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(less_sleep_sx_level =
+           recode_factor(less_sleep_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(less_sleep_sx_level)) %>%
+  freq(mdq.miss_found_sleep_usual.1_numeric)
+
+dat %>%
+  filter(is.na(less_sleep_sx_level)) %>%
+  freq(mdq.miss_found_sleep_usual.1_cop_numeric)
+
+# More talkative
+dat <- dat %>%
+  mutate(more_talkative_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.faster_spoke_talkative_usual.1_numeric) ~ mdq.faster_spoke_talkative_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.faster_spoke_talkative_usual.1_cop_numeric) ~ mdq.faster_spoke_talkative_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.faster_spoke_talkative_usual.1_numeric) &
+               !is.na(mdq.faster_spoke_talkative_usual.1_cop_numeric) ~ mdq.faster_spoke_talkative_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.faster_spoke_talkative_usual.1_cop_numeric) &
+               !is.na(mdq.faster_spoke_talkative_usual.1_numeric) ~ mdq.faster_spoke_talkative_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_talkative_sx_level =
+           recode_factor(more_talkative_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_talkative_sx_level)) %>%
+  freq(mdq.faster_spoke_talkative_usual.1_numeric)
+
+dat %>%
+  filter(is.na(more_talkative_sx_level)) %>%
+  freq(mdq.faster_spoke_talkative_usual.1_cop_numeric)
+
+
+# Racing thoughts
+dat <- dat %>%
+  mutate(racing_thoughts_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.head_mind_couldnt_slow.1_numeric) ~ mdq.head_mind_couldnt_slow.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.head_mind_couldnt_slow.1_cop_numeric) ~ mdq.head_mind_couldnt_slow.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.head_mind_couldnt_slow.1_numeric) &
+               !is.na(mdq.head_mind_couldnt_slow.1_cop_numeric) ~ mdq.head_mind_couldnt_slow.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.head_mind_couldnt_slow.1_cop_numeric) &
+               !is.na(mdq.head_mind_couldnt_slow.1_numeric) ~ mdq.head_mind_couldnt_slow.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(racing_thoughts_sx_level =
+           recode_factor(racing_thoughts_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(racing_thoughts_sx_level)) %>%
+  freq(mdq.head_mind_couldnt_slow.1_numeric)
+
+dat %>%
+  filter(is.na(racing_thoughts_sx_level)) %>%
+  freq(mdq.head_mind_couldnt_slow.1_cop_numeric)
+
+
+# Concentration difficulties
+dat <- dat %>%
+  mutate(conc_difficulties_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.staying_track_trouble_concentrating.1_numeric) ~ mdq.staying_track_trouble_concentrating.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.staying_track_trouble_concentrating.1_cop_numeric) ~ mdq.staying_track_trouble_concentrating.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.staying_track_trouble_concentrating.1_numeric) &
+               !is.na(mdq.staying_track_trouble_concentrating.1_cop_numeric) ~ mdq.staying_track_trouble_concentrating.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.staying_track_trouble_concentrating.1_cop_numeric) &
+               !is.na(mdq.staying_track_trouble_concentrating.1_numeric) ~ mdq.staying_track_trouble_concentrating.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(conc_difficulties_sx_level =
+           recode_factor(conc_difficulties_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(conc_difficulties_sx_level)) %>%
+  freq(mdq.staying_track_trouble_concentrating.1_numeric)
+
+dat %>%
+  filter(is.na(conc_difficulties_sx_level)) %>%
+  freq(mdq.staying_track_trouble_concentrating.1_cop_numeric)
+
+# More energy
+dat <- dat %>%
+  mutate(more_energy_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.you_had_much_more_energy_than_usual.1_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.you_had_much_more_energy_than_usual.1_cop_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.you_had_much_more_energy_than_usual.1_numeric) &
+               !is.na(mdq.you_had_much_more_energy_than_usual.1_cop_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.you_had_much_more_energy_than_usual.1_cop_numeric) &
+               !is.na(mdq.you_had_much_more_energy_than_usual.1_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_energy_sx_level =
+           recode_factor(more_energy_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_energy_sx_level)) %>%
+  freq(mdq.you_had_much_more_energy_than_usual.1_numeric)
+
+dat %>%
+  filter(is.na(more_energy_sx_level)) %>%
+  freq(mdq.you_had_much_more_energy_than_usual.1_cop_numeric)
+
+
+# More active
+dat <- dat %>%
+  mutate(more_active_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.active_usual_things.1_numeric) ~ mdq.active_usual_things.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.active_usual_things.1_cop_numeric) ~ mdq.active_usual_things.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.active_usual_things.1_numeric) &
+               !is.na(mdq.active_usual_things.1_cop_numeric) ~ mdq.active_usual_things.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.active_usual_things.1_cop_numeric) &
+               !is.na(mdq.active_usual_things.1_numeric) ~ mdq.active_usual_things.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_active_sx_level =
+           recode_factor(more_active_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_active_sx_level)) %>%
+  freq(mdq.active_usual_things.1_numeric)
+
+dat %>%
+  filter(is.na(more_active_sx_level)) %>%
+  freq(mdq.active_usual_things.1_cop_numeric)
+
+
+# More social
+dat <- dat %>%
+  mutate(more_social_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.outgoing_middle_night_usual.1_numeric) ~ mdq.outgoing_middle_night_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.outgoing_middle_night_usual.1_cop_numeric) ~ mdq.outgoing_middle_night_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.outgoing_middle_night_usual.1_numeric) &
+               !is.na(mdq.outgoing_middle_night_usual.1_cop_numeric) ~ mdq.outgoing_middle_night_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.outgoing_middle_night_usual.1_cop_numeric) &
+               !is.na(mdq.outgoing_middle_night_usual.1_numeric) ~ mdq.outgoing_middle_night_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_social_sx_level =
+           recode_factor(more_social_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_social_sx_level)) %>%
+  freq(mdq.outgoing_middle_night_usual.1_numeric)
+
+dat %>%
+  filter(is.na(more_social_sx_level)) %>%
+  freq(mdq.outgoing_middle_night_usual.1_cop_numeric)
+
+
+# Higher libido
+dat <- dat %>%
+  mutate(higher_libido_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.interested_sex_usual.1_numeric) ~ mdq.interested_sex_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.interested_sex_usual.1_cop_numeric) ~ mdq.interested_sex_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.interested_sex_usual.1_numeric) &
+               !is.na(mdq.interested_sex_usual.1_cop_numeric) ~ mdq.interested_sex_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.interested_sex_usual.1_cop_numeric) &
+               !is.na(mdq.interested_sex_usual.1_numeric) ~ mdq.interested_sex_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(higher_libido_sx_level =
+           recode_factor(higher_libido_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(higher_libido_sx_level)) %>%
+  freq(mdq.interested_sex_usual.1_numeric)
+
+dat %>%
+  filter(is.na(higher_libido_sx_level)) %>%
+  freq(mdq.interested_sex_usual.1_cop_numeric)
+
+
+# More risky/unusual behaviour
+dat <- dat %>%
+  mutate(more_risky_beh_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.excessive_foolish_risky_unusual.1_numeric) ~ mdq.excessive_foolish_risky_unusual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.excessive_foolish_risky_unusual.1_cop_numeric) ~ mdq.excessive_foolish_risky_unusual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.excessive_foolish_risky_unusual.1_numeric) &
+               !is.na(mdq.excessive_foolish_risky_unusual.1_cop_numeric) ~ mdq.excessive_foolish_risky_unusual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.excessive_foolish_risky_unusual.1_cop_numeric) &
+               !is.na(mdq.excessive_foolish_risky_unusual.1_numeric) ~ mdq.excessive_foolish_risky_unusual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_risky_beh_sx_level =
+           recode_factor(more_risky_beh_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_risky_beh_sx_level)) %>%
+  freq(mdq.excessive_foolish_risky_unusual.1_numeric)
+
+dat %>%
+  filter(is.na(more_risky_beh_sx_level)) %>%
+  freq(mdq.excessive_foolish_risky_unusual.1_cop_numeric)
+
+# Reckless spending
+dat <- dat %>%
+  mutate(reckless_spending_numeric_sx_level = 
+           case_when(
+             binge_eating_timing == "BE at sign-up" &  
+             !is.na(mdq.trouble_family_spending_money.1_numeric) ~ mdq.trouble_family_spending_money.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing) & 
+               !is.na(mdq.trouble_family_spending_money.1_cop_numeric) ~ mdq.trouble_family_spending_money.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing == "BE at sign-up" & 
+               is.na(mdq.trouble_family_spending_money.1_numeric) &
+               !is.na(mdq.trouble_family_spending_money.1_cop_numeric) ~ mdq.trouble_family_spending_money.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing) & 
+               is.na(mdq.trouble_family_spending_money.1_cop_numeric) &
+               !is.na(mdq.trouble_family_spending_money.1_numeric) ~ mdq.trouble_family_spending_money.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(reckless_spending_sx_level =
+           recode_factor(reckless_spending_numeric_sx_level,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(reckless_spending_sx_level)) %>%
+  freq(mdq.trouble_family_spending_money.1_numeric)
+
+dat %>%
+  filter(is.na(reckless_spending_sx_level)) %>%
+  freq(mdq.trouble_family_spending_money.1_cop_numeric)
+```
+
+### Sensitivity analysis - BE with no loss of control
+NB: Because we are comparing people with BE versus those without, we need to specify to keep people even if they reported no BE in GLAD or EDGI but did not take part in COPING. If these people DID take part in COPING, their answer in COPING would take priority over their answer in GLAD/EDGI because it's more up-to-date, so regardless of their answer, we would take their variable from COPING. In contrast, for the people who reported BE in GLAD/EDGI - this is the FIRST time they have reported it and so we need to take their variable from here.
+```{r sens selection of variables depending on when symptom reported}
+# First, identify whether people report BE in GLAD or EDGI sign-up (if yes, need to use variables from here)
+dat <- dat %>%
+  mutate(binge_eating_timing_sens = 
+           case_when(
+             
+             # GLAD or EDGI sign-up
+             # Binge eating with loss of control reported in ED100K (GLAD, EDGI)
+             (binge_eating == "Yes" |
+               (loss_of_control == "Slightly" |
+                loss_of_control == "Somewhat" |
+                loss_of_control == "Very" |
+                loss_of_control == "Extremely")) |
+               
+              # Fulfilled criteria for binge-type ED in GLAD or EDGI sign-up
+               (ed.DSM5_AN_binge_purge_binary_numeric == 1 |
+               an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging" |
+               ed.DSM5_BN_binary_numeric == 1 |
+               an.1.bulimia_nervosa_numeric == 1 |
+               mhd.bn_numeric == 1 |
+               ed.DSM5_BED_binary_numeric == 1 |
+               an.1.bingeeating_disorder == 1 |
+               mhd.bed_numeric == 1) ~ "BE at sign-up", # The only people we need to assign different variables for are people who met criteria at GLAD or EDGI sign-up FIRST. Otherwise, for everyone else, we will use their variables at COPING (if available). 
+             
+             # Binge eating no loss of control in GLAD/EDGI only
+             (binge_eating == "Yes" &
+                 loss_of_control == "No" &
+                 is.na(binge_eating_cop)) ~ "BE at sign-up", # The only people we need to assign different variables for are people who met criteria at GLAD or EDGI sign-up FIRST, however for the sensitivity analysis, these people might then have gone on to endorse loss of control in COPING, in which case we have categorised them as 'BE loss control' as this makes up the main analysis. Otherwise, for everyone else, we will use their variables at COPING (if available). 
+                 
+              # No binge eating reported in GLAD or EDGI sign-up and did not take part in COPING
+              (binge_eating == "No" &
+               is.na(binge_eating_cop)) ~ "BE at sign-up" # We want to keep these people and use their variables at GLAD or EDGI sign-up
+            
+             )
+           )
+
+# Check 
+dat %>%
+  freq(binge_eating_timing_sens)
+
+# BMI signup
+dat <- dat %>%
+  mutate(bmi_signup_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(dem.bmi_signup) ~ dem.bmi_signup, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(dem.bmi_signup_cop) ~ dem.bmi_signup_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(dem.bmi_signup) &
+               !is.na(dem.bmi_signup_cop) ~ dem.bmi_signup_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(dem.bmi_signup_cop) &
+               !is.na(dem.bmi_signup) ~ dem.bmi_signup # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(bmi_signup_sx_level_sens)) %>%
+  freq(dem.bmi_signup_cop)
+
+dat %>%
+  filter(is.na(bmi_signup_sx_level_sens)) %>%
+  freq(dem.bmi_signup)
+
+# Lowest BMI (would rather lowest BMI at ANY height [dem.bmi_an_lowest/dem.bmi_an_lowest_cop], than their lowest BMI at adult height if poss [dem.bmi_lowest/dem.bmi_lowest_cop])
+dat <- dat %>%
+  mutate(bmi_lowest_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(an.bmi_lowest) ~ an.bmi_lowest, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data (most desirable)
+             
+             binge_eating_timing_sens== "BE at sign-up" &   
+             !is.na(dem.bmi_lowest) ~ dem.bmi_lowest, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data (second desirable)
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(an.bmi_lowest_cop) ~ an.bmi_lowest_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data (most desirable)
+             
+              is.na(binge_eating_timing_sens) & 
+               !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data (second desirable)
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(an.bmi_lowest) & 
+               !is.na(dem.bmi_lowest) ~ dem.bmi_lowest, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data (missing most desirable)
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(dem.bmi_lowest) &
+               !is.na(an.bmi_lowest_cop) ~ an.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data (missing second most desirable)
+             
+              binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(an.bmi_lowest_cop) &
+               !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(an.bmi_lowest_cop) &
+               !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop, # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             is.na(binge_eating_timing_sens) & 
+               is.na(dem.bmi_lowest_cop) &
+               !is.na(an.bmi_lowest) ~ an.bmi_lowest, # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              is.na(binge_eating_timing_sens) & 
+               is.na(an.bmi_lowest) &
+               !is.na(dem.bmi_lowest) ~ dem.bmi_lowest # People with no GLAD/EDGI BE data but missing for COPING variable data
+            )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(bmi_lowest_sx_level_sens)) %>%
+  freq(an.bmi_lowest)
+
+dat %>%
+  filter(is.na(bmi_lowest_sx_level_sens)) %>%
+  freq(dem.bmi_lowest)
+
+dat %>%
+  filter(is.na(bmi_lowest_sx_level_sens)) %>%
+  freq(an.bmi_lowest_cop)
+
+dat %>%
+  filter(is.na(bmi_lowest_sx_level_sens)) %>%
+  freq(dem.bmi_lowest_cop)
+
+
+# Highest BMI
+dat <- dat %>%
+  mutate(bmi_highest_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(dem.bmi_highest) ~ dem.bmi_highest, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(dem.bmi_highest_cop) ~ dem.bmi_highest_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(dem.bmi_highest) &
+               !is.na(dem.bmi_highest_cop) ~ dem.bmi_highest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(dem.bmi_highest_cop) &
+               !is.na(dem.bmi_highest) ~ dem.bmi_highest # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(bmi_highest_sx_level_sens)) %>%
+  freq(dem.bmi_highest)
+
+dat %>%
+  filter(is.na(bmi_highest_sx_level_sens)) %>%
+  freq(dem.bmi_highest_cop)
+
+
+# Highest education
+dat <- dat %>%
+  mutate(highest_education_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(dem.highest_education_collapsed) ~ dem.highest_education_collapsed, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(employ.highest_education_collapsed_cop) ~ employ.highest_education_collapsed_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(dem.highest_education_collapsed) &
+               !is.na(employ.highest_education_collapsed_cop) ~ employ.highest_education_collapsed_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(employ.highest_education_collapsed_cop) &
+               !is.na(dem.highest_education_collapsed) ~ dem.highest_education_collapsed # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(highest_education_sx_level_sens)) %>%
+  freq(dem.highest_education_collapsed)
+
+dat %>%
+  filter(is.na(highest_education_sx_level_sens)) %>%
+  freq(employ.highest_education_collapsed_cop)
+
+# Gender
+dat <- dat %>%
+  mutate(gender_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(gender) ~ gender, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(gender_cop) ~ gender_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(gender) &
+               !is.na(gender_cop) ~ gender_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(gender_cop) &
+               !is.na(gender) ~ gender # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+              
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(gender_sx_level_sens)) %>%
+  freq(gender)
+
+dat %>%
+  filter(is.na(gender_sx_level_sens)) %>%
+  freq(gender_cop)
+
+# Age
+dat <- dat %>%
+  mutate(age_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(dem.dob_age) ~ dem.dob_age, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+              binge_eating_timing_sens== "BE at sign-up" &  
+             is.na(dem.dob_age) &
+               !is.na(selfreported_age) ~ selfreported_age, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+            
+             is.na(binge_eating_timing_sens) & 
+               !is.na(dem.dob_age_cop) ~ dem.dob_age_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             is.na(binge_eating_timing_sens) & 
+              is.na(dem.dob_age_cop) &
+             !is.na(dem.age_category_cop)  ~ as.numeric(dem.age_category_cop),  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(dem.dob_age) &
+               is.na(selfreported_age) &
+               !is.na(dem.dob_age_cop) ~ dem.dob_age_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(dem.dob_age) &
+               is.na(selfreported_age) &
+               is.na(dem.dob_age_cop) &
+              !is.na(dem.age_category_cop) ~ as.numeric(dem.age_category_cop), # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+            is.na(binge_eating_timing_sens) & 
+               is.na(dem.dob_age_cop) &
+               is.na(dem.age_category_cop) &
+               !is.na(dem.dob_age) ~ dem.dob_age, # People with no GLAD/EDGI BE data but missing for COPING variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               is.na(dem.dob_age_cop) &
+               is.na(dem.age_category_cop) &
+               is.na(dem.dob_age) &
+              !is.na(selfreported_age) ~ selfreported_age # People with GLAD/EDGI BE data but missing for COPING variable data
+             
+               
+             )
+         )
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(age_sx_level_sens)) %>%
+  freq(dem.dob_age)
+
+dat %>%
+  filter(is.na(age_sx_level_sens)) %>%
+  freq(dem.dob_age_cop)
+
+dat %>%
+  filter(is.na(age_sx_level_sens)) %>%
+  freq(selfreported_age)
+
+dat %>%
+  filter(is.na(age_sx_level_sens)) %>%
+  freq(dem.age_category_cop)
+
+# More hyperactive
+dat <- dat %>%
+  mutate(more_hyperactivity_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.hyper_normal_people_thought.1_numeric) ~ mdq.hyper_normal_people_thought.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.hyper_normal_people_thought.1_cop_numeric) ~ mdq.hyper_normal_people_thought.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.hyper_normal_people_thought.1_numeric) &
+               !is.na(mdq.hyper_normal_people_thought.1_cop_numeric) ~ mdq.hyper_normal_people_thought.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.hyper_normal_people_thought.1_cop_numeric) &
+               !is.na(mdq.hyper_normal_people_thought.1_numeric) ~ mdq.hyper_normal_people_thought.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_hyperactivity_sx_level_sens =
+           recode_factor(more_hyperactivity_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_hyperactivity_sx_level_sens)) %>%
+  freq(mdq.hyper_normal_people_thought.1_numeric)
+
+dat %>%
+  filter(is.na(more_hyperactivity_sx_level_sens)) %>%
+  freq(mdq.hyper_normal_people_thought.1_cop_numeric)
+
+
+# More irritability
+dat <- dat %>%
+  mutate(more_irritability_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.start_fights_shouted_arguments.1_numeric) ~ mdq.start_fights_shouted_arguments.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.start_fights_shouted_arguments.1_cop_numeric) ~ mdq.start_fights_shouted_arguments.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.start_fights_shouted_arguments.1_numeric) &
+               !is.na(mdq.start_fights_shouted_arguments.1_cop_numeric) ~ mdq.start_fights_shouted_arguments.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.start_fights_shouted_arguments.1_cop_numeric) &
+               !is.na(mdq.start_fights_shouted_arguments.1_numeric) ~ mdq.start_fights_shouted_arguments.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_irritability_sx_level_sens =
+           recode_factor(more_irritability_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_irritability_sx_level_sens)) %>%
+  freq(mdq.start_fights_shouted_arguments.1_numeric)
+
+dat %>%
+  filter(is.na(more_irritability_sx_level_sens)) %>%
+  freq(mdq.start_fights_shouted_arguments.1_cop_numeric)
+
+# More self-confidence
+dat <- dat %>%
+  mutate(more_self_confidence_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.usual_felt_selfconfident.1_numeric) ~ mdq.usual_felt_selfconfident.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.usual_felt_selfconfident.1_cop_numeric) ~ mdq.usual_felt_selfconfident.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.usual_felt_selfconfident.1_numeric) &
+               !is.na(mdq.usual_felt_selfconfident.1_cop_numeric) ~ mdq.usual_felt_selfconfident.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.usual_felt_selfconfident.1_cop_numeric) &
+               !is.na(mdq.usual_felt_selfconfident.1_numeric) ~ mdq.usual_felt_selfconfident.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_self_confidence_sx_level_sens =
+           recode_factor(more_self_confidence_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_self_confidence_sx_level_sens)) %>%
+  freq(mdq.usual_felt_selfconfident.1_numeric)
+
+dat %>%
+  filter(is.na(more_self_confidence_sx_level_sens)) %>%
+  freq(mdq.usual_felt_selfconfident.1_cop_numeric)
+
+
+# Less sleep
+dat <- dat %>%
+  mutate(less_sleep_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.miss_found_sleep_usual.1_numeric) ~ mdq.miss_found_sleep_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.miss_found_sleep_usual.1_cop_numeric) ~ mdq.miss_found_sleep_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.miss_found_sleep_usual.1_numeric) &
+               !is.na(mdq.miss_found_sleep_usual.1_cop_numeric) ~ mdq.miss_found_sleep_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.miss_found_sleep_usual.1_cop_numeric) &
+               !is.na(mdq.miss_found_sleep_usual.1_numeric) ~ mdq.miss_found_sleep_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(less_sleep_sx_level_sens =
+           recode_factor(less_sleep_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(less_sleep_sx_level_sens)) %>%
+  freq(mdq.miss_found_sleep_usual.1_numeric)
+
+dat %>%
+  filter(is.na(less_sleep_sx_level_sens)) %>%
+  freq(mdq.miss_found_sleep_usual.1_cop_numeric)
+
+# More talkative
+dat <- dat %>%
+  mutate(more_talkative_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.faster_spoke_talkative_usual.1_numeric) ~ mdq.faster_spoke_talkative_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.faster_spoke_talkative_usual.1_cop_numeric) ~ mdq.faster_spoke_talkative_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.faster_spoke_talkative_usual.1_numeric) &
+               !is.na(mdq.faster_spoke_talkative_usual.1_cop_numeric) ~ mdq.faster_spoke_talkative_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.faster_spoke_talkative_usual.1_cop_numeric) &
+               !is.na(mdq.faster_spoke_talkative_usual.1_numeric) ~ mdq.faster_spoke_talkative_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_talkative_sx_level_sens =
+           recode_factor(more_talkative_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_talkative_sx_level_sens)) %>%
+  freq(mdq.faster_spoke_talkative_usual.1_numeric)
+
+dat %>%
+  filter(is.na(more_talkative_sx_level_sens)) %>%
+  freq(mdq.faster_spoke_talkative_usual.1_cop_numeric)
+
+
+# Racing thoughts
+dat <- dat %>%
+  mutate(racing_thoughts_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.head_mind_couldnt_slow.1_numeric) ~ mdq.head_mind_couldnt_slow.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.head_mind_couldnt_slow.1_cop_numeric) ~ mdq.head_mind_couldnt_slow.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.head_mind_couldnt_slow.1_numeric) &
+               !is.na(mdq.head_mind_couldnt_slow.1_cop_numeric) ~ mdq.head_mind_couldnt_slow.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.head_mind_couldnt_slow.1_cop_numeric) &
+               !is.na(mdq.head_mind_couldnt_slow.1_numeric) ~ mdq.head_mind_couldnt_slow.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(racing_thoughts_sx_level_sens =
+           recode_factor(racing_thoughts_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(racing_thoughts_sx_level_sens)) %>%
+  freq(mdq.head_mind_couldnt_slow.1_numeric)
+
+dat %>%
+  filter(is.na(racing_thoughts_sx_level_sens)) %>%
+  freq(mdq.head_mind_couldnt_slow.1_cop_numeric)
+
+
+# Concentration difficulties
+dat <- dat %>%
+  mutate(conc_difficulties_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.staying_track_trouble_concentrating.1_numeric) ~ mdq.staying_track_trouble_concentrating.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.staying_track_trouble_concentrating.1_cop_numeric) ~ mdq.staying_track_trouble_concentrating.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.staying_track_trouble_concentrating.1_numeric) &
+               !is.na(mdq.staying_track_trouble_concentrating.1_cop_numeric) ~ mdq.staying_track_trouble_concentrating.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.staying_track_trouble_concentrating.1_cop_numeric) &
+               !is.na(mdq.staying_track_trouble_concentrating.1_numeric) ~ mdq.staying_track_trouble_concentrating.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(conc_difficulties_sx_level_sens =
+           recode_factor(conc_difficulties_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(conc_difficulties_sx_level_sens)) %>%
+  freq(mdq.staying_track_trouble_concentrating.1_numeric)
+
+dat %>%
+  filter(is.na(conc_difficulties_sx_level_sens)) %>%
+  freq(mdq.staying_track_trouble_concentrating.1_cop_numeric)
+
+# More energy
+dat <- dat %>%
+  mutate(more_energy_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.you_had_much_more_energy_than_usual.1_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.you_had_much_more_energy_than_usual.1_cop_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.you_had_much_more_energy_than_usual.1_numeric) &
+               !is.na(mdq.you_had_much_more_energy_than_usual.1_cop_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.you_had_much_more_energy_than_usual.1_cop_numeric) &
+               !is.na(mdq.you_had_much_more_energy_than_usual.1_numeric) ~ mdq.you_had_much_more_energy_than_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_energy_sx_level_sens =
+           recode_factor(more_energy_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_energy_sx_level_sens)) %>%
+  freq(mdq.you_had_much_more_energy_than_usual.1_numeric)
+
+dat %>%
+  filter(is.na(more_energy_sx_level_sens)) %>%
+  freq(mdq.you_had_much_more_energy_than_usual.1_cop_numeric)
+
+
+# More active
+dat <- dat %>%
+  mutate(more_active_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.active_usual_things.1_numeric) ~ mdq.active_usual_things.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.active_usual_things.1_cop_numeric) ~ mdq.active_usual_things.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.active_usual_things.1_numeric) &
+               !is.na(mdq.active_usual_things.1_cop_numeric) ~ mdq.active_usual_things.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.active_usual_things.1_cop_numeric) &
+               !is.na(mdq.active_usual_things.1_numeric) ~ mdq.active_usual_things.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_active_sx_level_sens =
+           recode_factor(more_active_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_active_sx_level_sens)) %>%
+  freq(mdq.active_usual_things.1_numeric)
+
+dat %>%
+  filter(is.na(more_active_sx_level_sens)) %>%
+  freq(mdq.active_usual_things.1_cop_numeric)
+
+
+# More social
+dat <- dat %>%
+  mutate(more_social_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.outgoing_middle_night_usual.1_numeric) ~ mdq.outgoing_middle_night_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.outgoing_middle_night_usual.1_cop_numeric) ~ mdq.outgoing_middle_night_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.outgoing_middle_night_usual.1_numeric) &
+               !is.na(mdq.outgoing_middle_night_usual.1_cop_numeric) ~ mdq.outgoing_middle_night_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.outgoing_middle_night_usual.1_cop_numeric) &
+               !is.na(mdq.outgoing_middle_night_usual.1_numeric) ~ mdq.outgoing_middle_night_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_social_sx_level_sens =
+           recode_factor(more_social_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_social_sx_level_sens)) %>%
+  freq(mdq.outgoing_middle_night_usual.1_numeric)
+
+dat %>%
+  filter(is.na(more_social_sx_level_sens)) %>%
+  freq(mdq.outgoing_middle_night_usual.1_cop_numeric)
+
+
+# Higher libido
+dat <- dat %>%
+  mutate(higher_libido_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.interested_sex_usual.1_numeric) ~ mdq.interested_sex_usual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.interested_sex_usual.1_cop_numeric) ~ mdq.interested_sex_usual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.interested_sex_usual.1_numeric) &
+               !is.na(mdq.interested_sex_usual.1_cop_numeric) ~ mdq.interested_sex_usual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.interested_sex_usual.1_cop_numeric) &
+               !is.na(mdq.interested_sex_usual.1_numeric) ~ mdq.interested_sex_usual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(higher_libido_sx_level_sens =
+           recode_factor(higher_libido_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(higher_libido_sx_level_sens)) %>%
+  freq(mdq.interested_sex_usual.1_numeric)
+
+dat %>%
+  filter(is.na(higher_libido_sx_level_sens)) %>%
+  freq(mdq.interested_sex_usual.1_cop_numeric)
+
+
+# More risky/unusual behaviour
+dat <- dat %>%
+  mutate(more_risky_beh_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.excessive_foolish_risky_unusual.1_numeric) ~ mdq.excessive_foolish_risky_unusual.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.excessive_foolish_risky_unusual.1_cop_numeric) ~ mdq.excessive_foolish_risky_unusual.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.excessive_foolish_risky_unusual.1_numeric) &
+               !is.na(mdq.excessive_foolish_risky_unusual.1_cop_numeric) ~ mdq.excessive_foolish_risky_unusual.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.excessive_foolish_risky_unusual.1_cop_numeric) &
+               !is.na(mdq.excessive_foolish_risky_unusual.1_numeric) ~ mdq.excessive_foolish_risky_unusual.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(more_risky_beh_sx_level_sens =
+           recode_factor(more_risky_beh_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(more_risky_beh_sx_level_sens)) %>%
+  freq(mdq.excessive_foolish_risky_unusual.1_numeric)
+
+dat %>%
+  filter(is.na(more_risky_beh_sx_level_sens)) %>%
+  freq(mdq.excessive_foolish_risky_unusual.1_cop_numeric)
+
+# Reckless spending
+dat <- dat %>%
+  mutate(reckless_spending_numeric_sx_level_sens = 
+           case_when(
+             binge_eating_timing_sens== "BE at sign-up" &  
+             !is.na(mdq.trouble_family_spending_money.1_numeric) ~ mdq.trouble_family_spending_money.1_numeric, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data
+             
+             is.na(binge_eating_timing_sens) & 
+               !is.na(mdq.trouble_family_spending_money.1_cop_numeric) ~ mdq.trouble_family_spending_money.1_cop_numeric,  # People with no GLAD/EDGI BE data and not missing for COPING variable data
+             
+             binge_eating_timing_sens== "BE at sign-up" & 
+               is.na(mdq.trouble_family_spending_money.1_numeric) &
+               !is.na(mdq.trouble_family_spending_money.1_cop_numeric) ~ mdq.trouble_family_spending_money.1_cop_numeric, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              is.na(binge_eating_timing_sens) & 
+               is.na(mdq.trouble_family_spending_money.1_cop_numeric) &
+               !is.na(mdq.trouble_family_spending_money.1_numeric) ~ mdq.trouble_family_spending_money.1_numeric # People with no GLAD/EDGI BE data but missing for COPING variable data
+            
+             )
+         )
+
+
+# Recode to factor
+dat <- dat %>%
+  mutate(reckless_spending_sx_level_sens =
+           recode_factor(reckless_spending_numeric_sx_level_sens,
+                          "1" = "Yes",
+                         "0" = "No"))
+
+# Check (people with ANY variable data should have a value in the newly-created variable)
+dat %>%
+  filter(is.na(reckless_spending_sx_level_sens)) %>%
+  freq(mdq.trouble_family_spending_money.1_numeric)
+
+dat %>%
+  filter(is.na(reckless_spending_sx_level_sens)) %>%
+  freq(mdq.trouble_family_spending_money.1_cop_numeric)
+```
+
+# Save dataset for analysis
+```{r save dataset for analysis}
+dat %>% 
+  saveRDS(
+    file = paste0("../data/dat_variables_", 
+    date, 
+    ".rds"
+    )
+    )
+```
+

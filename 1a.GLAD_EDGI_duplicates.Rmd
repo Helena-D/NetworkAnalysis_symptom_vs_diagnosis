@@ -1,0 +1,193 @@
+---
+title: "1a.GLAD_EDGI_duplicates"
+author: "Helena Davies"
+date: "30/11/2021"
+output: html_document
+---
+
+NB: These are duplicated IDs from *registration*. Therefore, there will be some people who have missing data for all questionnaires within a sign-up survey (i.e., they never actually did the survey).
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = '',
+  prompt = FALSE,
+  cache = FALSE
+  )
+```
+
+Clear global environment prior to initiation
+```{r Clear global environment}
+remove(list = ls())
+```
+
+Read in file with path to data channel
+```{r Read in file with path to data channel on teams}
+source(file = "../credentials/paths.R")
+```
+
+Add the add_numeric function - used to convert character variables into numeric variables
+Add the remove_duplicates function - used to deduplicate and remove NAs from IDs
+Add the sumscores function - used to generate sumscores
+Add the package_check function - used to install and load dependencies
+Add the imp_check function - used to check variables for implausible values
+```{r Read in functions}
+source(file = paste0(filepath_functions, "add_numeric.R"))
+source(file = paste0(filepath_functions, "remove_duplicates.R"))
+source(file = paste0(filepath_functions, "package_check.R"))
+source("./functions.R")
+```
+
+Use package_check to install and load dependencies
+Load tidyverse last
+```{r Install load dependencies}
+packages <- c("summarytools", "sjlabelled", "Amelia", "gtsummary", "skimr", "psych", "rstatix", "gt", "broom", "scales",
+              "tidyverse" )
+package_check(packages)
+```
+
+Retrieve recent date
+We are using the recent date to save files with paste0() as an extension to not overwrite old versions
+```{r Recent date}
+date <- Sys.Date()
+date
+```
+
+# Read in duplicated people sheet
+```{r read in duplicated people sheet}
+dup_people <- read_csv(file = paste0(filepath_own, "/duplicate_participant_report_2021_11_30_hashed.csv"))
+# 882 people
+```
+
+Filter out people in main dataset with same ID
+```{r}
+dat <- readRDS(file = paste0("../data/dat_merged_2021-11-30.rds"))
+dim(dat)
+colnames(dat)
+
+# Filter full data for GLAD data (also EDGI participants, 556)
+same_people_GLAD_dat <- dat %>%
+  filter(ID %in% dup_people$hash_id_GLAD)
+
+# Filter full data for EDGI data (also GLAD participants, 551)
+same_people_EDGI_dat <- dat %>%
+  filter(ID %in% dup_people$hash_id_EDGI)
+```
+
+*We want to keep*:
+1) People who filled out the ED100K in EDGI 
+2) If not in EDGI (perhaps they never finished the survey), then people who filled out the ED100K in GLAD or GLAD COPING 
+
+Who has filled out the EDGI ED100K?
+```{r look at ED frequency}
+# Filled out EDGI ED100K
+EDGI_dat_ED100k <- same_people_EDGI_dat %>%
+  filter( 
+    # ED100K 
+         !is.na(ed.DSM5_AN_binary_numeric) |
+         !is.na(ed.DSM5_AN_restricting_binary_numeric) |
+         !is.na(ed.DSM5_AN_binge_purge_binary_numeric)  |
+         !is.na(ed.DSM5_BN_binary_numeric)  |  
+         !is.na(ed.DSM5_BED_binary_numeric) |
+         !is.na(binge_eating)
+           ) %>%
+  pull(ID) # 525 people (out of a total 882 EDGI IDs that I have in my data. Therefore, there are 357 people who have EDGI IDs but not EDGI ED100K data)
+
+# For these people, we want their GLAD ID (to check if they have done the GLAD ED100K)
+no_EDGI_dat_ED100k_GLAD_IDs <- dup_people %>%
+ filter(hash_id_EDGI %!in% EDGI_dat_ED100k) %>%
+  pull(hash_id_GLAD)
+
+# People  who have not filled out the EDGI ED100K - have they filled it out in GLAD COPING? (The ED100K was not asked again in EDGI...this would be a more recent entry than their GLAD entry so should take these if poss)
+GLAD_ED100K_check_cop <- same_people_GLAD_dat %>%
+  filter(ID %in% no_EDGI_dat_ED100k_GLAD_IDs &
+    # GLAD 
+         (!is.na(ed.DSM5_AN_binary_numeric_cop) |
+         !is.na(ed.DSM5_AN_restricting_binary_numeric_cop) |
+         !is.na(ed.DSM5_AN_binge_purge_binary_numeric_cop)  |
+         !is.na(ed.DSM5_BN_binary_numeric_cop)  |  
+         !is.na(ed.DSM5_BED_binary_numeric_cop) |
+         !is.na(binge_eating_cop))
+           ) %>%
+  pull(ID) # 69 people
+
+# People people who have not filled out the EDGI ED100K - have they filled it out in GLAD?
+GLAD_ED100K_check <- same_people_GLAD_dat %>%
+  filter(
+    # Have not filled out the EDGI ED100K or the GLAD COPING ED100K
+    (ID %in% no_EDGI_dat_ED100k_GLAD_IDs &
+         ID %!in% GLAD_ED100K_check_cop) &
+   
+         (!is.na(ed.DSM5_AN_binary_numeric) |
+         !is.na(ed.DSM5_AN_restricting_binary_numeric) |
+         !is.na(ed.DSM5_AN_binge_purge_binary_numeric)  |
+         !is.na(ed.DSM5_BN_binary_numeric)  |  
+         !is.na(ed.DSM5_BED_binary_numeric) |
+         !is.na(binge_eating))
+           ) %>%
+  pull(ID) # 19 people
+
+# Merge GLAD IDs to keep (i.e., people who did not fill out the EDGI ED100K but did so in GLAD COPING or GLAD signup)
+GLAD_IDs_to_keep <- c(GLAD_ED100K_check_cop,
+                      GLAD_ED100K_check)  
+
+
+# For everyone else, we want to keep their EDGI ID (even though there are still ~ 200 people who have not done the EDGI ED100K, they have not filled it out in GLAD or GLAD COPING either, so we will keep their EDGI data as a default as it is likely the most recent and relevant to my projects)
+# For these people, we want their GLAD ID (to check if they have done the GLAD ED100K)
+EDGI_IDs_to_keep <- dup_people %>%
+ filter(hash_id_GLAD %!in% GLAD_IDs_to_keep) %>%
+  pull(hash_id_EDGI)
+
+# Merge GLAD and EDGI IDs to keep 
+GLAD_EDGI_IDs_to_keep <- c(GLAD_IDs_to_keep,
+                      EDGI_IDs_to_keep)  
+
+# Create as dataframe
+GLAD_EDGI_IDs_to_keep_dat <- as.data.frame(GLAD_EDGI_IDs_to_keep)
+```
+
+Create IDs to drop data frame
+```{r create IDs to drop data frame}
+EDGI_IDs_to_drop <- dup_people %>%
+ filter(hash_id_EDGI %!in% GLAD_EDGI_IDs_to_keep) %>%
+  pull(hash_id_EDGI)
+
+GLAD_IDs_to_drop <- dup_people %>%
+ filter(hash_id_GLAD %!in% GLAD_EDGI_IDs_to_keep) %>%
+  pull(hash_id_GLAD)
+
+# Merge GLAD and EDGI IDs to drop
+GLAD_EDGI_IDs_to_drop <- c(GLAD_IDs_to_drop,
+                      EDGI_IDs_to_drop)  
+
+GLAD_EDGI_IDs_to_drop_dat <- as.data.frame(GLAD_EDGI_IDs_to_drop)
+```
+
+Double check no IDs overlap
+```{r checking no overlapping IDs}
+overlapping_IDs <- GLAD_EDGI_IDs_to_keep_dat %>%
+  filter(GLAD_EDGI_IDs_to_keep %in% GLAD_EDGI_IDs_to_drop_dat$GLAD_EDGI_IDs_to_drop)
+
+overlapping_IDs_2 <- GLAD_EDGI_IDs_to_drop_dat %>%
+  filter(GLAD_EDGI_IDs_to_drop %in% GLAD_EDGI_IDs_to_keep_dat$GLAD_EDGI_IDs_to_keep)
+```
+30/11/21: No IDs overlap!
+
+Export as data frame 
+```{r save as data frames}
+GLAD_EDGI_IDs_to_drop_dat %>% 
+  saveRDS(
+    file = paste0("../data/GLAD_EDGI_IDs_to_drop_dat_", 
+    date, 
+    ".rds"
+    )
+    )
+
+GLAD_EDGI_IDs_to_keep_dat %>% 
+  saveRDS(
+    file = paste0("../data/GLAD_EDGI_IDs_to_keep_dat_", 
+    date, 
+    ".rds"
+    )
+    )
+```
+

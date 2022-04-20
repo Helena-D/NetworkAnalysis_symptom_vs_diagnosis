@@ -1,0 +1,932 @@
+---
+title: "1. Merging"
+author: "Helena Davies"
+date: "20/08/2021"
+output: html_document
+---
+
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = '',
+  prompt = FALSE,
+  cache = FALSE
+  )
+```
+
+Clear global environment prior to initiation
+```{r Clear global environment}
+remove(list = ls())
+```
+
+Read in file with path to data channel
+```{r Read in file with path to data channel on teams}
+source(file = "../credentials/paths.R")
+```
+
+Add the add_numeric function - used to convert character variables into numeric variables
+Add the remove_duplicates function - used to deduplicate and remove NAs from IDs
+Add the sumscores function - used to generate sumscores
+Add the package_check function - used to install and load dependencies
+Add the imp_check function - used to check variables for implausible values
+```{r Read in functions}
+source(file = paste0(filepath_functions, "add_numeric.R"))
+source(file = paste0(filepath_functions, "remove_duplicates.R"))
+source(file = paste0(filepath_functions, "package_check.R"))
+source("./functions.R")
+```
+
+Use package_check to install and load dependencies
+Load tidyverse last
+```{r Install load dependencies}
+packages <- c("summarytools", "sjlabelled", "Amelia", "gtsummary", "tidyverse")
+package_check(packages)
+```
+
+Retrieve recent date
+We are using the recent date to save files with paste0() as an extension to not overwrite old versions
+```{r Recent date}
+date <- Sys.Date()
+date
+```
+
+# Mood Disorder Questionnaire (MDQ): Mania symptoms - for GLAD, EDGI, and NBR
+Read in data 
+```{r Read in data mdq}
+# EDGI
+mdq_edgi_signup <- readRDS(file = paste0(filepath, "/latest_freeze/edgi/clinical/mdq_edgi_clean.rds"))
+
+mdq_edgi_signup %>%
+  dim()
+
+mdq_edgi_signup %>%
+  colnames()
+
+# Select columns
+mdq_edgi_signup <- mdq_edgi_signup %>%
+  select(ID,
+         sample, 
+         mdq.hyper_normal_people_thought.1_numeric,                         
+         mdq.start_fights_shouted_arguments.1_numeric,                      
+         mdq.usual_felt_selfconfident.1_numeric,                             
+         mdq.miss_found_sleep_usual.1_numeric,                               
+         mdq.faster_spoke_talkative_usual.1_numeric,                         
+         mdq.head_mind_couldnt_slow.1_numeric,                               
+         mdq.staying_track_trouble_concentrating.1_numeric,                  
+         mdq.you_had_much_more_energy_than_usual.1_numeric,                  
+         mdq.active_usual_things.1_numeric,                              
+         mdq.outgoing_middle_night_usual.1_numeric,                      
+         mdq.interested_sex_usual.1_numeric,                                 
+         mdq.excessive_foolish_risky_unusual.1_numeric,                  
+         mdq.trouble_family_spending_money.1_numeric
+         )
+
+# EDGI COPING
+mdq_edgi_cop <- readRDS(file = paste0(filepath, "/latest_freeze/coping_edgi/clinical/mdq_coping_edgi_clean.rds"))
+
+mdq_edgi_cop %>%
+  dim()
+
+mdq_edgi_cop %>%
+  colnames()
+
+# Select columns
+mdq_edgi_cop <- mdq_edgi_cop %>%
+  select(ID,
+         sample,
+         mdq.hyper_normal_people_thought.1_cop_numeric,                         
+         mdq.start_fights_shouted_arguments.1_cop_numeric,                      
+         mdq.usual_felt_selfconfident.1_cop_numeric,                             
+         mdq.miss_found_sleep_usual.1_cop_numeric,                               
+         mdq.faster_spoke_talkative_usual.1_cop_numeric,                         
+         mdq.head_mind_couldnt_slow.1_cop_numeric,                               
+         mdq.staying_track_trouble_concentrating.1_cop_numeric,                  
+         mdq.you_had_much_more_energy_than_usual.1_cop_numeric,                  
+         mdq.active_usual_things.1_cop_numeric,                              
+         mdq.outgoing_middle_night_usual.1_cop_numeric,                      
+         mdq.interested_sex_usual.1_cop_numeric,                                 
+         mdq.excessive_foolish_risky_unusual.1_cop_numeric,                  
+         mdq.trouble_family_spending_money.1_cop_numeric
+  )
+
+
+# Merge EDGI and EDGI COPING
+# the MDQ was optional in EDGI but compulsory in COPING. So, there might be some people who are in one dataset but not another.
+mdq_edgi <- dplyr::full_join(mdq_edgi_cop,
+                          mdq_edgi_signup,
+                          by = c("ID",
+                                  "sample"
+                                  )
+)
+
+
+# Check
+mdq_edgi %>%
+  dim()
+
+# GLAD 
+mdq_glad <- readRDS(file = paste0(filepath, "/latest_freeze/glad/clinical/mdq_glad_clean.rds"))
+
+mdq_glad %>%
+  dim()
+
+mdq_glad %>%
+  colnames()
+
+# Select columns
+mdq_glad <- mdq_glad %>%
+  select(ID,
+         sample,
+         mdq.hyper_normal_people_thought.1_numeric,
+         mdq.start_fights_shouted_arguments.1_numeric,
+         mdq.usual_felt_selfconfident.1_numeric,
+         mdq.miss_found_sleep_usual.1_numeric,
+         mdq.faster_spoke_talkative_usual.1_numeric,
+         mdq.head_mind_couldnt_slow.1_numeric,
+         mdq.staying_track_trouble_concentrating.1_numeric,
+         mdq.you_had_much_more_energy_than_usual.1_numeric,
+         mdq.active_usual_things.1_numeric,
+         mdq.outgoing_middle_night_usual.1_numeric,
+         mdq.interested_sex_usual.1_numeric,
+         mdq.excessive_foolish_risky_unusual.1_numeric,
+         mdq.trouble_family_spending_money.1_numeric
+  )
+
+
+# NBR
+mdq_nbr <- readRDS(file = paste0(filepath, "/latest_freeze/coping_nbr/clinical/mdq_coping_nbr_clean.rds"))
+
+mdq_nbr %>%
+  dim()
+
+mdq_nbr %>%
+  colnames()
+
+# Select columns
+mdq_nbr <- mdq_nbr %>%
+  select(ID,
+         sample,
+         mdq.hyper_normal_people_thought.1_cop_numeric,                         
+         mdq.start_fights_shouted_arguments.1_cop_numeric,                      
+         mdq.usual_felt_selfconfident.1_cop_numeric,                             
+         mdq.miss_found_sleep_usual.1_cop_numeric,                               
+         mdq.faster_spoke_talkative_usual.1_cop_numeric,                         
+         mdq.head_mind_couldnt_slow.1_cop_numeric,                               
+         mdq.staying_track_trouble_concentrating.1_cop_numeric,                  
+         mdq.you_had_much_more_energy_than_usual.1_cop_numeric,                  
+         mdq.active_usual_things.1_cop_numeric,                              
+         mdq.outgoing_middle_night_usual.1_cop_numeric,                      
+         mdq.interested_sex_usual.1_cop_numeric,                                 
+         mdq.excessive_foolish_risky_unusual.1_cop_numeric,                  
+         mdq.trouble_family_spending_money.1_cop_numeric
+  )
+
+# Bind mdq data
+mdq <- mdq_edgi %>%
+  bind_rows(mdq_glad,
+            mdq_nbr)
+
+# Check 
+mdq %>%
+  nrow()
+
+mdq %>%
+  colnames()    
+```
+
+# Ethnicity
+Merged: GLAD, EDGI, NBR COPING 
+Read in data
+```{r read in ethnicity data}
+# GLAD & EDGI
+ethnicity_glad_edgi <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/demographics/ethnicity_glad_edgi_clean.rds"))
+
+ethnicity_glad_edgi %>%
+  dim()
+
+ethnicity_glad_edgi %>%
+  colnames()
+
+ethnicity_glad_edgi <- ethnicity_glad_edgi %>%
+  select(ID,
+         sample,
+         ethnicity = dem.what_is_your_ethnic_origin
+         )
+
+# NBR
+ethnicity_nbr <- readRDS(file = paste0(filepath, "/latest_freeze/coping_nbr/demographics/ethnicity_coping_nbr_clean.rds"))
+
+ethnicity_nbr %>%
+  dim()
+
+ethnicity_nbr %>%
+  colnames()
+
+ethnicity_nbr <- ethnicity_nbr %>%
+  select(ID,
+         sample,
+         ethnicity = dem.what_is_your_ethnic_origin_cop
+         )
+
+# Bind
+ethnicity <- ethnicity_nbr %>%
+  bind_rows(ethnicity_glad_edgi)
+```
+
+# ED100K: Eating disorder diagnoses from DSM-5 algorithm
+Merged: GLAD optional, GLAD COPING, EDGI, NBR COPING
+Read in data
+```{r Read in data ed.diagnoses}
+# GLAD
+ed_diagnoses_glad_signup <- readRDS(file = paste0(filepath, "/latest_freeze/glad/algorithms/ed_algorithms_diagnostics_glad_clean.rds"))
+
+ed_diagnoses_glad_signup %>%
+  dim()
+
+ed_diagnoses_glad_signup %>%
+  colnames()
+
+# Select columns
+ed_diagnoses_glad_signup <- ed_diagnoses_glad_signup %>%
+  select(ID,
+         sample,
+         ed.DSM5_AN_binary_numeric,
+         ed.DSM5_AN_binary,
+         ed.DSM5_AN_restricting_binary,
+         ed.DSM5_AN_restricting_binary_numeric,
+         ed.DSM5_AN_binge_purge_binary_numeric,
+         ed.DSM5_AN_binge_purge_binary,
+         ed.DSM5_AN_binge_only_binary_numeric,
+       #  ed.DSM5_AN_binge_only_binary,
+         ed.DSM5_AN_purge_only_binary_numeric,
+       #  ed.DSM5_AN_purge_only_binary,
+         ed.DSM5_BED_binary,
+         ed.DSM5_BED_binary_numeric,
+         ed.DSM5_BN_binary,
+         ed.DSM5_BN_binary_numeric
+         )
+
+# GLAD COPING
+ed_diagnoses_glad_cop <- readRDS(file = paste0(filepath, "/latest_freeze/coping_glad/algorithms/ed_algorithms_diagnostics_coping_glad_clean.rds"))
+
+ed_diagnoses_glad_cop %>%
+  dim()
+
+ed_diagnoses_glad_cop %>%
+  colnames()
+
+# Select columns
+ed_diagnoses_glad_cop <- ed_diagnoses_glad_cop %>%
+  select(ID,
+         sample,
+         ed.DSM5_AN_binary_numeric_cop,
+         ed.DSM5_AN_binary_cop,
+         ed.DSM5_AN_restricting_binary_cop,
+         ed.DSM5_AN_restricting_binary_numeric_cop,
+         ed.DSM5_AN_binge_purge_binary_numeric_cop,
+         ed.DSM5_AN_binge_purge_binary_cop,
+         ed.DSM5_BED_binary_cop,
+         ed.DSM5_BED_binary_numeric_cop,
+         ed.DSM5_BN_binary_cop,
+         ed.DSM5_BN_binary_numeric_cop,
+         ed.DSM5_AN_binge_only_binary_numeric_cop,
+         ed.DSM5_AN_binge_only_binary_cop,
+         ed.DSM5_AN_purge_only_binary_numeric_cop,
+         ed.DSM5_AN_purge_only_binary_cop
+         )
+
+
+# Merge GLAD and GLAD COPING
+# the ED100K was optional in GLAD but compulsory in COPING. So, there might be some people who are in one dataset but not another.
+ed_diagnoses_glad <- dplyr::full_join(ed_diagnoses_glad_cop,
+                          ed_diagnoses_glad_signup,
+                          by = c("ID",
+                                  "sample"
+                                  )
+)
+
+# Check
+ed_diagnoses_glad %>%
+  dim()
+
+# Check
+ed_diagnoses_glad %>%
+  nrow()
+
+ed_diagnoses_glad %>%
+  colnames()
+
+# EDGI
+ed_diagnoses_edgi <- readRDS(file = paste0(filepath, "/latest_freeze/edgi/algorithms/ed_algorithms_diagnostics_edgi_clean.rds"))
+
+ed_diagnoses_edgi %>%
+  dim()
+
+ed_diagnoses_edgi %>%
+  colnames()
+
+# NBR
+ed_diagnoses_nbr <- readRDS(file = paste0(filepath, "/latest_freeze/coping_nbr/algorithms/ed_algorithms_diagnostics_coping_nbr_clean.rds"))
+
+ed_diagnoses_nbr %>%
+  dim()
+
+ed_diagnoses_nbr %>%
+  colnames()
+
+# Select columns
+ed_diagnoses_nbr <- ed_diagnoses_nbr %>%
+  select(ID,
+         sample,
+         ed.DSM5_AN_binary_numeric_cop,
+         ed.DSM5_AN_binary_cop,
+         ed.DSM5_AN_restricting_binary_cop,
+         ed.DSM5_AN_restricting_binary_numeric_cop,
+         ed.DSM5_AN_binge_purge_binary_numeric_cop,
+         ed.DSM5_AN_binge_purge_binary_cop,
+         ed.DSM5_BED_binary_cop,
+         ed.DSM5_BED_binary_numeric_cop,
+         ed.DSM5_BN_binary_cop,
+         ed.DSM5_BN_binary_numeric_cop
+         )
+
+# Merge all data
+ed_diagnoses <- ed_diagnoses_glad %>%
+  bind_rows(ed_diagnoses_edgi,
+            ed_diagnoses_nbr
+            )
+
+# Check
+ed_diagnoses %>%
+  dim()
+
+ed_diagnoses %>%
+  colnames()
+```
+
+# ED100K: Self-report eating disorder diagnoses 
+Merged: GLAD optional
+Read in data
+```{r Read in data ed.diagnoses}
+ed_selfreport_diagnoses_GLAD <- readRDS(file = paste0(filepath, "/latest_freeze/glad/eating/selfreported_ed100k_diagnoses_glad_clean.rds"))
+
+ed_selfreport_diagnoses_GLAD %>%
+  dim()
+
+ed_selfreport_diagnoses_GLAD %>%
+  colnames()
+```
+
+# Mental health diagnosis questionnaire (MHD): Self-reported eating disorder diagnoses
+Merged: GLAD, GLAD COPING, EDGI, EDGI COPING, NBR COPING
+Read in data
+```{r Read in data}
+# GLAD, EDGI
+mhd_glad_edgi <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/clinical/mhd_glad_edgi_clean.rds"))
+
+mhd_glad_edgi %>%
+  dim()
+
+mhd_glad_edgi %>%
+  colnames()
+
+excluded_vars <- c("startDate",
+                   "endDate"
+                   )
+
+mhd_glad_edgi <- mhd_glad_edgi %>%
+  select(-one_of(excluded_vars))
+
+# GLAD COPING & NBR 
+mhd_coping_glad_nbr <- readRDS(file = paste0(filepath, "/latest_freeze/coping_glad_nbr/clinical/mhd_coping_glad_nbr_clean.rds"))
+
+mhd_coping_glad_nbr %>%
+  dim()
+
+mhd_coping_glad_nbr %>%
+  colnames()
+
+mhd_coping_glad_nbr <- mhd_coping_glad_nbr %>%
+  select(-one_of(excluded_vars))
+
+# Merge
+mhd <- dplyr::full_join(mhd_glad_edgi,
+                          mhd_coping_glad_nbr,
+                          by = c("ID",
+                                  "sample"
+                                  )
+)
+
+# Check
+mhd %>%
+  dim()
+
+mhd %>%
+  nrow()
+```
+
+# ED100K disordered eating symptoms
+Merged: GLAD, GLAD COPING, EDGI, EDGI COPING, NBR COPING
+Read in data
+```{r Read in data binge_eating}
+# GLAD & EDGI
+disordered_eating_symptoms_glad_edgi_signup  <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/behaviours/ED_behaviours_glad_edgi_clean.rds"))
+
+disordered_eating_symptoms_glad_edgi_signup  %>%
+  dim()
+
+disordered_eating_symptoms_glad_edgi_signup %>%
+  colnames()
+
+disordered_eating_symptoms_glad_edgi_signup <- disordered_eating_symptoms_glad_edgi_signup %>%
+  select(ID,
+         sample,
+         binge_eating = be.short_period_ate_regard,
+         loss_of_control = be.binge_eating_stop_eating
+         )
+
+# GLAD COPING 
+disordered_eating_symptoms_glad_coping <- readRDS(file = paste0(filepath, "/latest_freeze/coping_glad/behaviours/ED_behaviours_coping_glad_clean.rds"))
+
+disordered_eating_symptoms_glad_coping %>%
+  dim()
+
+disordered_eating_symptoms_glad_coping %>%
+  colnames()
+
+disordered_eating_symptoms_glad_coping <- disordered_eating_symptoms_glad_coping %>%
+  select(ID,
+         sample,
+         binge_eating_cop = be.short_period_ate_regard_cop,
+         loss_of_control_cop = be.binge_eating_stop_eating_cop
+         )
+
+# Merge GLAD & EDGI with GLAD COPING
+disordered_eating_symptoms_glad_edgi <- dplyr::full_join(disordered_eating_symptoms_glad_coping,
+                          disordered_eating_symptoms_glad_edgi_signup,
+                          by = c("ID",
+                                  "sample"
+                                  )
+)
+
+# Check
+disordered_eating_symptoms_glad_edgi %>%
+  dim()
+
+# Check
+disordered_eating_symptoms_glad_edgi %>%
+  nrow()
+
+# NBR
+disordered_eating_symptoms_nbr <- readRDS(file = paste0(filepath, "/latest_freeze/coping_nbr/behaviours/ED_behaviours_nbr_clean.rds"))
+
+disordered_eating_symptoms_nbr %>%
+  dim()
+
+disordered_eating_symptoms_nbr %>%
+  colnames()
+
+disordered_eating_symptoms_nbr <- disordered_eating_symptoms_nbr %>%
+  select(ID,
+         sample,
+         binge_eating_cop = be.short_period_ate_regard_coping,
+         loss_of_control_cop = be.binge_eating_stop_eating_coping
+         )
+
+# Bind
+disordered_eating_symptoms <- disordered_eating_symptoms_glad_edgi %>%
+  bind_rows(disordered_eating_symptoms_nbr)
+```
+
+# Age 
+Merged: GLAD, EDGI COPING, NBR COPING (NB: want to adjust symptoms for age)
+Read in data
+```{r Read in data age}
+# GLAD & EDGI
+age_glad_edgi_signup <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/demographics/age_glad_edgi_clean.rds"))
+
+age_glad_edgi_signup %>%
+  dim()
+
+age_glad_edgi_signup %>%
+  colnames()
+
+age_glad_edgi_signup <- age_glad_edgi_signup %>%
+  select(ID,
+         sample,
+         selfreported_age = dem.how_old_are_you_now.txt,
+         dem.dob_age,
+         dem.age_category
+         )
+
+# GLAD COPING, EDGI COPING, & NBR
+age_coping_glad_edgi_nbr <- readRDS(file = paste0(filepath, "/latest_freeze/coping_glad_edgi_nbr/demographics/age_coping_glad_edgi_nbr_clean.rds"))
+
+age_coping_glad_edgi_nbr %>%
+  dim()
+
+age_coping_glad_edgi_nbr %>%
+  colnames()
+
+
+age_coping_glad_edgi_nbr <- age_coping_glad_edgi_nbr %>%
+  select(ID,
+         sample,
+         dem.dob_age_cop,
+         dem.age_category_cop
+         )
+
+# Merge
+age <- dplyr::full_join(age_glad_edgi_signup,
+                          age_coping_glad_edgi_nbr,
+                          by = c("ID",
+                                  "sample"
+                                  )
+)
+```
+
+# Sex 
+Merged: GLAD, EDGI COPING, NBR COPING (NB: want to adjust symptoms for sex)
+Read in data
+```{r Read in data sex}
+# GLAD & EDGI
+sex_gender_edgi_glad_signup <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/demographics/sex_gender_sexuality_glad_edgi_clean.rds"))
+
+sex_gender_edgi_glad_signup %>%
+  colnames()
+
+sex_gender_edgi_glad_signup %>%
+  dim()
+
+sex_gender_edgi_glad_signup <- sex_gender_edgi_glad_signup %>%
+  select(ID,
+         sample,
+         sex_numeric = dem.sex_numeric,
+         sex = dem.sex,
+         gender = dem.which_gender_do_you_identify_with,
+         gender_numeric = dem.which_gender_do_you_identify_with_numeric,
+         transgender = dem.do_you_identify_as_transgender,
+         transgender_numeric = dem.do_you_identify_as_transgender_numeric
+         )
+
+# GLAD COPING, EDGI COPING, & NBR
+sex_gender_coping <- readRDS(file = paste0(filepath, "/latest_freeze/coping_glad_edgi_nbr/demographics/sex_gender_sexuality_coping_glad_edgi_nbr_clean.rds"))
+
+sex_gender_coping %>%
+  colnames()
+
+sex_gender_coping %>%
+  dim()
+
+sex_gender_coping <- sex_gender_coping %>%
+  select(ID,
+         sample,
+         sex_cop = dem.sex_cop,
+         sex_cop_numeric =  dem.sex_cop_numeric,
+         gender_cop = dem.which_gender_do_you_identify_with_cop,
+          gender_cop_numeric = dem.which_gender_do_you_identify_with_cop_numeric,
+          transgender_cop = dem.do_you_identify_as_transgender_cop,
+          transgender_cop_numeric = dem.do_you_identify_as_transgender_cop_numeric
+         )
+
+# Merge data
+sex_gender <- dplyr::full_join(sex_gender_coping,
+                          sex_gender_edgi_glad_signup,
+                          by = c("ID",
+                                  "sample"
+                                  )
+)
+
+# Check
+sex_gender %>%
+  dim()
+
+# Check
+sex_gender %>%
+  nrow()
+```
+ 
+# Highest education 
+Merged: GLAD, EDGI COPING, NBR COPING 
+Read in data
+```{r Read in data education.years }
+# GLAD & EDGI
+highest_education_edgi_glad_signup <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/demographics/highest_education_glad_edgi_clean.rds"))
+
+highest_education_edgi_glad_signup %>%
+  colnames()
+
+highest_education_edgi_glad_signup %>%
+  dim()
+
+highest_education_edgi_glad_signup <- highest_education_edgi_glad_signup %>%
+  select(ID,
+        sample,
+        dem.highest_education_collapsed,
+        dem.highest_education_finegrained
+        )
+
+# GLAD COPING, EDGI COPING, & NBR
+highest_education_coping <- readRDS(file = paste0(filepath, "/latest_freeze/coping_glad_edgi_nbr/demographics/highest_education_coping_glad_edgi_nbr_clean.rds"))
+
+highest_education_coping %>%
+  colnames()
+
+highest_education_coping %>%
+  dim()
+
+highest_education_coping <- highest_education_coping %>%
+  select(ID,
+        sample,
+        employ.highest_education_collapsed_cop,
+        employ.highest_education_finegrained_cop
+        )
+
+# Merge GLAD COPING, EDGI COPING, & NBR with GLAD & EDGI
+highest_education <- dplyr::full_join(highest_education_coping,
+                          highest_education_edgi_glad_signup,
+                          by = c("ID",
+                                  "sample"
+                                  )
+)
+
+# Check
+highest_education %>%
+  colnames()
+
+# Check
+highest_education %>%
+  nrow()
+```
+
+# BMI (at time of assessment) 
+Merged: GLAD sign-up, EDGI sign-up, NBR COPING 
+Read in data
+```{r Read in data bmi}
+# GLAD & EDGI
+bmi_edgi_glad_signup <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/demographics/signup_bmi_height_weight_glad_edgi_clean.rds"))
+
+bmi_edgi_glad_signup %>%
+  colnames()
+
+bmi_edgi_glad_signup %>%
+  dim()
+
+bmi_edgi_glad_signup <- bmi_edgi_glad_signup %>%
+  select(ID,
+         sample, 
+         dem.bmi_signup
+         )
+
+# GLAD COPING, EDGI COPING, & NBR
+bmi_coping <- readRDS(file = paste0(filepath, "/latest_freeze/coping_glad_edgi_nbr/demographics/signup_bmi_height_weight_coping_glad_edgi_nbr_clean.rds"))
+
+bmi_coping %>%
+  colnames()
+
+bmi_coping %>%
+  dim()
+
+bmi_coping <- bmi_coping %>%
+  select(ID,
+         sample, 
+         dem.bmi_signup_cop
+         )
+
+# Merge GLAD COPING, EDGI COPING, & NBR with GLAD & EDGI
+bmi_at_assessment <- dplyr::full_join(bmi_coping,
+                          bmi_edgi_glad_signup,
+                          by = c("ID",
+                                  "sample"
+                                  )
+)
+
+# Check
+bmi_at_assessment %>%
+  dim()
+
+# Check
+bmi_at_assessment %>%
+  nrow()
+```
+
+# Lowest BMI 
+Merged: GLAD, GLAD COPING, EDGI, EDGI COPING, NBR (AN lowest BMI not assessed in EDGI COPING)
+Read in data
+```{r Read in data bmi}
+# GLAD & EDGI
+lowest_bmi_edgi_glad_signup <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/demographics/lowest_bmi_height_weight_glad_edgi_clean.rds"))
+
+lowest_bmi_edgi_glad_signup %>%
+  colnames()
+
+lowest_bmi_edgi_glad_signup %>%
+  dim()
+
+lowest_bmi_edgi_glad_signup <- lowest_bmi_edgi_glad_signup %>%
+  select(ID,
+         sample, 
+         dem.bmi_lowest,
+         an.bmi_lowest
+         )
+
+# GLAD COPING, EDGI COPING, & NBR
+lowest_bmi_coping <- readRDS(file = paste0(filepath, "/latest_freeze/coping_glad_edgi_nbr/demographics/lowest_bmi_height_weight_coping_glad_edgi_nbr_clean.rds"))
+
+lowest_bmi_coping %>%
+  colnames()
+
+lowest_bmi_coping %>%
+  dim()
+
+lowest_bmi_coping <- lowest_bmi_coping %>%
+  select(ID,
+         sample, 
+         dem.bmi_lowest_cop,
+         an.bmi_lowest_cop
+         )
+
+# Merge GLAD COPING, EDGI COPING, & NBR with GLAD & EDGI
+bmi_lowest <- dplyr::full_join(lowest_bmi_coping,
+                          lowest_bmi_edgi_glad_signup,
+                          by = c("ID",
+                                  "sample"
+                                  )
+)
+
+# Check
+bmi_lowest %>%
+  dim()
+
+# Check
+bmi_lowest %>%
+  nrow()
+```
+
+# Highest BMI
+Merged: GLAD, GLAD COPING, EDGI, EDGI COPING, NBR
+Read in data
+```{r Read in data bmi}
+# GLAD & EDGI
+highest_bmi_edgi_glad_signup <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/demographics/highest_bmi_height_weight_glad_edgi_clean.rds"))
+
+highest_bmi_edgi_glad_signup %>%
+  colnames()
+
+highest_bmi_edgi_glad_signup %>%
+  dim()
+
+highest_bmi_edgi_glad_signup <- highest_bmi_edgi_glad_signup %>%
+  select(ID,
+         sample, 
+         dem.bmi_highest
+         )
+
+# GLAD COPING, EDGI COPING, & NBR
+highest_bmi_coping <- readRDS(file = paste0(filepath, "/latest_freeze/coping_glad_edgi_nbr/demographics/highest_bmi_weight_coping_glad_edgi_nbr_clean.rds"))
+
+highest_bmi_coping %>%
+  colnames()
+
+highest_bmi_coping %>%
+  dim()
+
+highest_bmi_coping <- highest_bmi_coping %>%
+  select(ID,
+         sample, 
+         dem.bmi_highest_cop
+         )
+
+# Merge GLAD COPING, EDGI COPING, & NBR with GLAD & EDGI
+bmi_highest <- dplyr::full_join(highest_bmi_coping,
+                          highest_bmi_edgi_glad_signup,
+                          by = c("ID",
+                                  "sample"
+                                  )
+)
+
+# Check
+bmi_highest %>%
+  dim()
+
+# Check
+bmi_highest %>%
+  nrow()
+```
+
+# Merge data
+```{r merge data}
+# Merge all data
+dat_1 <- dplyr::full_join(mdq,
+                          ethnicity,
+                          by = c("ID",
+                "sample"
+                )
+         )
+
+dat_2 <- dplyr::full_join(dat_1,
+                          ed_diagnoses,
+                          by = c("ID",
+                "sample"
+                )
+         )
+  
+dat_3 <- dplyr::full_join(dat_2,
+                          ed_selfreport_diagnoses_GLAD,
+                          by = c("ID",
+                "sample"
+                )
+         )
+  
+dat_4 <- dplyr::full_join(dat_3,
+                          disordered_eating_symptoms,
+                          by = c("ID",
+                "sample"
+                )
+         )
+
+dat_5 <- dplyr::full_join(dat_4,
+                          age,
+                          by = c("ID",
+                "sample"
+                )
+         )
+
+dat_6 <- dplyr::full_join(dat_5,
+                          sex_gender,
+                          by = c("ID",
+                "sample"
+                )
+         )
+
+dat_7 <- dplyr::full_join(dat_6,
+                          highest_education,
+                          by = c("ID",
+                "sample"
+                )
+         )
+
+dat_8 <- dplyr::full_join(dat_7,
+                          mhd,
+                          by = c("ID",
+                "sample"
+                )
+         )
+
+dat_9 <- dplyr::full_join(dat_8,
+                          bmi_at_assessment,
+                          by = c("ID",
+                "sample"
+                )
+         )
+
+
+dat_10 <- dplyr::full_join(dat_9,
+                          bmi_lowest,
+                          by = c("ID",
+                "sample"
+                )
+         )
+
+dat_merged <- dplyr::full_join(dat_10,
+                          bmi_highest,
+                          by = c("ID",
+                "sample"
+                )
+         )
+
+# Check
+dat_merged %>%
+  colnames()
+
+dat_merged %>%
+  dim()
+```
+
+# Recode -777 to NA_real_
+```{r}
+dat_merged_NA_rm <- dat_merged %>%
+  mutate_if(is.numeric, ~na_if(., -888)) %>% # Recode missing values to NAs in numeric variables
+  mutate_if(is.numeric, ~na_if(., -999)) %>%
+  mutate_if(is.numeric, ~na_if(., -777)) %>%
+  mutate_if(is.numeric, ~na_if(., -666)) %>%
+  mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
+  mutate_if(is.factor, ~na_if(., "Don't know")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
+  mutate_if(is.factor, ~na_if(., "Prefer not to answer")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Seen but not answered")) %>% # Drop empty factor levels
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Don't know")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Prefer not to answer")) %>%
+  mutate_if(is.factor, ~forcats::fct_drop(., only = "Prefer not to say"))
+```
+
+# Save merged data
+```{r save merged data}
+dat_merged_NA_rm %>% 
+  saveRDS(
+    file = paste0("../data/dat_merged_", 
+    date, 
+    ".rds"
+    )
+    )
+```

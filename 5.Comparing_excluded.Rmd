@@ -1,0 +1,555 @@
+---
+title: "Comparing excluded to non-excluded participants"
+author: "Helena Davies"
+date: "04/04/2022"
+output: html_document
+---
+
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = '',
+  prompt = FALSE,
+  cache = FALSE
+  )
+```
+
+Clear global environment prior to initiation
+```{r Clear global environment}
+remove(list = ls())
+```
+
+Read in file with path to data channel
+```{r Read in file with path to data channel on teams}
+source(file = "../credentials/paths.R")
+```
+
+Add the add_numeric function - used to convert character variables into numeric variables
+Add the remove_duplicates function - used to deduplicate and remove NAs from IDs
+Add the sumscores function - used to generate sumscores
+Add the package_check function - used to install and load dependencies
+Add the imp_check function - used to check variables for implausible values
+```{r Read in functions}
+source(file = paste0(filepath_functions, "add_numeric.R"))
+source(file = paste0(filepath_functions, "remove_duplicates.R"))
+source(file = paste0(filepath_functions, "package_check.R"))
+source("./functions.R")
+```
+
+Use package_check to install and load dependencies
+Load tidyverse last
+```{r Install load dependencies}
+packages <- c("summarytools", "sjlabelled", "Amelia", "gtsummary", "tidyverse")
+package_check(packages)
+```
+
+Retrieve recent date
+We are using the recent date to save files with paste0() as an extension to not overwrite old versions
+```{r Recent date}
+date <- Sys.Date()
+date
+```
+
+# Read in data
+```{r read in merged data}
+symptom_dat <- readRDS(file = paste0("../data/symptom_dat_analysis2022-03-15.rds"))
+dim(symptom_dat) 
+colnames(symptom_dat)
+
+excluded_dat <- readRDS(file = paste0("../data/excluded_dat_analysis2022-04-04.rds"))
+dim(excluded_dat) 
+colnames(excluded_dat)
+
+demographic_dat <- readRDS(file = paste0("../data/dat_variables_2022-03-15.rds"))
+dim(demographic_dat) 
+colnames(demographic_dat)
+```
+
+```{r create excluded variable}
+excluded_dat <- excluded_dat %>%
+  mutate(excluded =
+           case_when(
+             ID %in% excluded_dat$ID ~ 1
+           ))
+
+symptom_dat <- symptom_dat %>%
+  mutate(excluded =
+           case_when(
+             ID %in% symptom_dat$ID ~ 0
+           ))
+```
+
+```{r select variables}
+symptom_dat <- symptom_dat %>%
+  filter(binge_eating_with_loss_control == "No BE" |
+         binge_eating_with_loss_control == "BE loss control") %>%
+  select(ID,
+         excluded,
+         sex_final,
+         age_dem = age_sx_level,
+         bmi_signup_dem = bmi_signup_sx_level,
+         bmi_lowest_dem = bmi_lowest_sx_level,
+         bmi_highest_dem = bmi_highest_sx_level,
+         racially_minoritised,
+         highest_education = highest_education_sx_level
+         )
+
+excluded_dat <- excluded_dat %>%
+  select(ID,
+         excluded)
+
+demographic_dat <- demographic_dat %>%
+  select(ID,
+         dem.bmi_signup,
+         an.bmi_lowest,
+         dem.bmi_signup_cop,
+         dem.bmi_lowest,
+         an.bmi_lowest_cop,
+         dem.bmi_lowest_cop,
+         dem.bmi_highest,
+         dem.bmi_highest_cop,
+         dem.highest_education_collapsed,
+         employ.highest_education_collapsed_cop,
+         sex_final,
+         dem.dob_age,
+         dem.dob_age_cop,
+         selfreported_age,
+         dem.age_category_cop,
+         ethnicity,
+         racially_minoritised
+         )
+```
+
+# Merge exlcuded data with demographic data
+```{r merge data}
+dat <- dplyr::left_join(excluded_dat,
+                        demographic_dat,
+                        by = "ID")
+```
+
+# Create variables based on COPING or GLAD/EDGI data
+## Sex
+```{r sex check}
+dat %>%
+  freq(sex_final)
+```
+
+## Age
+```{r age create variables based on data available}
+dat <- dat %>%
+  mutate(age_dem =
+           case_when(
+             !is.na(dem.dob_age) ~ dem.dob_age,
+             !is.na(selfreported_age) ~ selfreported_age,
+             !is.na(dem.dob_age_cop) ~ dem.dob_age_cop
+           ))
+
+# Check
+dat %>%
+  freq(age_dem)
+
+dat %>%
+  filter(is.na(age_dem)) %>%
+  freq(dem.dob_age)
+
+dat %>%
+  filter(is.na(age_dem)) %>%
+  freq(selfreported_age)
+
+dat %>%
+  filter(is.na(age_dem)) %>%
+  freq(dem.dob_age_cop)
+
+dat %>%
+  filter(is.na(age_dem)) %>%
+  freq(dem.age_category_cop)
+```
+
+## Racially minoritised
+```{r racially_minoritised check (already made)}
+# Check
+dat %>%
+  freq(racially_minoritised)
+```
+
+## BMI lowest
+```{r bmi lowest create variables based on data available}
+dat <- dat %>%
+  mutate(bmi_lowest_dem =
+           case_when(
+             !is.na(an.bmi_lowest) ~ an.bmi_lowest,
+             !is.na(dem.bmi_lowest) ~ dem.bmi_lowest,
+             !is.na(an.bmi_lowest_cop) ~ an.bmi_lowest_cop,
+             !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop
+           ))
+
+# Check
+dat %>%
+  freq(bmi_lowest_dem)
+
+dat %>%
+  filter(is.na(bmi_lowest_dem)) %>%
+  freq(an.bmi_lowest)
+
+dat %>%
+  filter(is.na(bmi_lowest_dem)) %>%
+  freq(dem.bmi_lowest)
+
+dat %>%
+  filter(is.na(bmi_lowest_dem)) %>%
+  freq(an.bmi_lowest_cop)
+
+dat %>%
+  filter(is.na(bmi_lowest_dem)) %>%
+  freq(dem.bmi_lowest_cop)
+```
+
+## BMI highest
+```{r bmi highest create variables based on data available}
+dat <- dat %>%
+  mutate(bmi_highest_dem =
+           case_when(
+             !is.na(dem.bmi_highest) ~ dem.bmi_highest,
+             !is.na(dem.bmi_highest_cop) ~ dem.bmi_highest_cop,
+           ))
+
+# Check
+dat %>%
+  freq(bmi_highest_dem)
+
+dat %>%
+  filter(is.na(bmi_highest_dem)) %>%
+  freq(dem.bmi_highest)
+
+dat %>%
+  filter(is.na(bmi_highest_dem)) %>%
+  freq(dem.bmi_highest_cop)
+```
+
+## BMI signup
+```{r bmi highest create variables based on data available}
+dat <- dat %>%
+  mutate(bmi_signup_dem =
+           case_when(
+             !is.na(dem.bmi_signup) ~ dem.bmi_signup,
+             !is.na(dem.bmi_signup_cop) ~ dem.bmi_signup_cop,
+           ))
+
+# Check
+dat %>%
+  descr(dem.bmi_signup)
+
+dat %>%
+  filter(is.na(bmi_signup_dem)) %>%
+  freq(dem.bmi_signup)
+
+dat %>%
+  filter(is.na(bmi_signup_dem)) %>%
+  freq(dem.bmi_signup_cop)
+```
+
+## Highest education
+```{r highest education create variables based on data available}
+dat <- dat %>%
+  mutate(highest_education =
+           case_when(
+             !is.na(dem.highest_education_collapsed) ~ dem.highest_education_collapsed,
+             !is.na(employ.highest_education_collapsed_cop) ~ employ.highest_education_collapsed_cop,
+           ))
+
+# Check
+dat %>%
+  freq(highest_education)
+
+dat %>%
+  filter(is.na(highest_education)) %>%
+  freq(dem.highest_education_collapsed)
+
+dat %>%
+  filter(is.na(highest_education)) %>%
+  freq(employ.highest_education_collapsed_cop)
+```
+
+# Merge excluded data with analysis data
+```{r merge excluded data with analysis data}
+excl_dat <- dat %>%
+  select(ID,
+         excluded,
+         age_dem,
+         sex_final,
+         racially_minoritised,
+         highest_education,
+         bmi_lowest_dem,
+         bmi_highest_dem,
+         bmi_signup_dem)
+
+dat_merged <- excl_dat %>%
+  bind_rows(symptom_dat)
+```
+
+```{r create AS levels or higher variable}
+# Create A levels or higher variable
+dat_merged <- dat_merged %>%
+  mutate(AS_Levels_higher =
+           case_when(highest_education == "None of the above"  |
+                       highest_education == "GCSEs/CSEs/O-levels or equivalent"  |
+                       highest_education == "NVQ/HND/HNC or equivalent"  ~ "No",
+                    
+                     highest_education == "A-levels/AS-levels or equivalent" |
+                       highest_education == "University" ~ "Yes"
+                    )
+         )
+
+# check
+dat_merged %>%
+  freq(AS_Levels_higher)
+```
+# COMPARISONS
+## Categorical variables
+```{r create non-numeric variable for excluded}
+dat_merged <- dat_merged %>%
+  mutate(excluded_factor =
+           case_when(excluded == 1 ~ "Yes",
+                     excluded == 0 ~ "No"))
+```
+
+```{r list categorical dummy variables symptom}
+descriptives.columns <- c(
+  "excluded",
+         "sex_final",
+         "racially_minoritised",
+         "AS_Levels_higher"
+)
+
+descriptives.columns.dummy <- c(
+         "sex_final",
+         "racially_minoritised",
+         "AS_Levels_higher"
+)
+```
+
+Dummy coding for categorical variables
+```{r dummy coding categorical variables symptom}
+# Create dataset
+descriptives_df <- dat_merged %>%
+  select(descriptives.columns)
+
+# Dummy coding
+descriptives_dummy <- fastDummies::dummy_cols(descriptives_df,
+                                              select_columns = descriptives.columns.dummy
+                                              )
+# Check
+colnames(descriptives_dummy)
+```
+
+## Being female
+```{r chi-squared sex}
+dat_merged %>%
+  group_by(excluded) %>%
+  freq(sex_final)
+
+
+sex <- table(descriptives_dummy$excluded,
+             descriptives_dummy$sex_final_Female
+             
+             )
+
+sex_chisq <- chisq.test(sex)
+
+# P value
+sex_chisq$p.value
+```
+
+# AS levels or higher
+```{r chi-squared AS levels or higher}
+dat_merged %>%
+  group_by(excluded) %>%
+  freq(AS_Levels_higher)
+
+
+edu <- table(descriptives_dummy$excluded,
+             descriptives_dummy$AS_Levels_higher_Yes
+             
+             )
+
+edu_chisq <- chisq.test(edu)
+
+# P value
+edu_chisq$p.value
+```
+
+# Racially minoritised
+```{r chi-squared racially minoritised}
+dat_merged %>%
+  group_by(excluded) %>%
+  freq(racially_minoritised)
+
+race <- table(descriptives_dummy$excluded,
+             descriptives_dummy$racially_minoritised_Yes
+             
+             )
+
+race_chisq <- chisq.test(race)
+
+# P value
+race_chisq$p.value
+```
+# Continious variables
+## Generate mode function
+```{r mode function symptom}
+mode_func <- function(x, na.rm = FALSE) {
+  if(na.rm){
+    x = x[!is.na(x)]
+  }
+
+  ux <- unique(x)
+  return(ux[which.max(tabulate(match(x, ux)))])
+}
+```
+
+## Table: Comparison of continuous variables
+```{r table compare continuous variables symptom}
+# Create table
+numeric_table <- dat_merged %>% 
+  group_by(excluded) %>%
+  summarise_at(vars(age_dem,
+                    bmi_signup_dem,
+                    bmi_lowest_dem,
+                    bmi_highest_dem),
+    .funs =
+      list(
+        ~mean(., na.rm = T),
+        ~sd(., na.rm = T),
+        ~IQR(., na.rm=T),
+        mode = ~mode_func(., na.rm = T),
+        ~median(., na.rm = T),
+        ~min(., na.rm = T),
+        ~max(., na.rm = T),
+        missing = ~skimr::n_missing(.),
+        ~skew(., na.rm = T),
+        kurtosis = ~kurtosi(., na.rm = T)
+      )
+  )
+
+numeric_table
+```
+
+```{r checking normality}
+# Age
+ggpubr::ggqqplot(dat_merged,
+         "age_dem",
+         facet.by = "excluded")
+
+dat_merged %>%
+  filter(excluded == 1) %>%
+  ggplot(mapping = aes(x = age_dem)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of age in excluded participants") +
+  xlab("Age")
+
+# BMI lowest
+ggpubr::ggqqplot(dat_merged,
+         "bmi_lowest_dem",
+         facet.by = "excluded")
+
+dat_merged %>%
+  filter(excluded == 1) %>%
+  ggplot(mapping = aes(x = bmi_lowest_dem)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of lowest BMI in excluded participants") +
+  xlab("Lowest BMI")
+
+# BMI highest
+ggpubr::ggqqplot(dat_merged,
+         "bmi_highest_dem",
+         facet.by = "excluded")
+
+dat_merged %>%
+  filter(excluded == 1) %>%
+  ggplot(mapping = aes(x = bmi_highest_dem)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of highest BMI in excluded participants") +
+  xlab("Highest BMI")
+
+# BMI signup
+ggpubr::ggqqplot(dat_merged,
+         "bmi_signup_dem",
+         facet.by = "excluded")
+
+dat_merged %>%
+  filter(excluded == 1) %>%
+  ggplot(mapping = aes(x = bmi_signup_dem)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of signup BMI in excluded participants") +
+  xlab("Signup BMI")
+```
+
+## Age 
+Testing homoscedasticity: Levene’s test
+```{r check homoscedasticity of age}
+car::leveneTest(age_dem ~ excluded_factor,
+                data = dat_merged) 
+```
+
+Both assumptions violated; so performed the non-parametric equivalent of t-test: Mann-Whitney
+```{r independent 2-group Mann-Whitney U test age }
+age_wilcox <- wilcox.test(dat_merged$age_dem ~ dat_merged$excluded_factor,
+            correct = FALSE,
+            exact = FALSE)
+
+
+print(age_wilcox)
+```
+## BMI lowest
+Testing homoscedasticity: Levene’s test
+```{r check homoscedasticity of lowest bmi}
+car::leveneTest(bmi_lowest_dem ~ excluded_factor,
+                data = dat_merged) 
+```
+
+Both assumptions violated; so performed the non-parametric equivalent of t-test: Mann-Whitney
+```{r independent 2-group Mann-Whitney U test bmi_lowest_dem }
+bmi_lowest_dem_wilcox <- wilcox.test(dat_merged$bmi_lowest_dem ~ dat_merged$excluded_factor,
+            correct = FALSE,
+            exact = FALSE)
+
+
+print(bmi_lowest_dem_wilcox)
+```
+## BMI highest
+Testing homoscedasticity: Levene’s test
+```{r check homoscedasticity of highest bmi}
+car::leveneTest(bmi_highest_dem ~ excluded_factor,
+                data = dat_merged) 
+```
+
+Both assumptions violated; so performed the non-parametric equivalent of t-test: Mann-Whitney
+```{r independent 2-group Mann-Whitney U test bmi_highest_dem }
+bmi_highest_dem_wilcox <- wilcox.test(dat_merged$bmi_highest_dem ~ dat_merged$excluded_factor,
+            correct = FALSE,
+            exact = FALSE)
+
+
+print(bmi_highest_dem_wilcox)
+```
+
+## BMI signup
+Testing homoscedasticity: Levene’s test
+```{r check homoscedasticity of signup bmi}
+car::leveneTest(bmi_signup_dem ~ excluded_factor,
+                data = dat_merged) 
+```
+
+Both assumptions violated; so performed the non-parametric equivalent of t-test: Mann-Whitney
+```{r independent 2-group Mann-Whitney U test bmi_signup_dem }
+bmi_signup_dem_wilcox <- wilcox.test(dat_merged$bmi_signup_dem ~ dat_merged$excluded_factor,
+            correct = FALSE,
+            exact = FALSE)
+
+
+print(bmi_signup_dem_wilcox)
+```

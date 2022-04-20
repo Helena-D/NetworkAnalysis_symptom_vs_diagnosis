@@ -1,0 +1,2980 @@
+---
+title: "Descriptives: Main analysis"
+author: "Helena Davies"
+date: "11/01/2022"
+output: html_document
+---
+
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = '',
+  prompt = FALSE,
+  cache = FALSE
+  )
+```
+
+Clear global environment prior to initiation
+```{r Clear global environment}
+remove(list = ls())
+```
+
+Read in file with path to data channel
+```{r Read in file with path to data channel on teams}
+source(file = "../credentials/paths.R")
+```
+
+Add the add_numeric function - used to convert character variables into numeric variables
+Add the remove_duplicates function - used to deduplicate and remove NAs from IDs
+Add the sumscores function - used to generate sumscores
+Add the package_check function - used to install and load dependencies
+Add the imp_check function - used to check variables for implausible values
+```{r Read in functions}
+source(file = paste0(filepath_functions, "add_numeric.R"))
+source(file = paste0(filepath_functions, "remove_duplicates.R"))
+source(file = paste0(filepath_functions, "package_check.R"))
+source("./functions.R")
+```
+
+Use package_check to install and load dependencies
+Load tidyverse last
+```{r Install load dependencies}
+packages <- c("summarytools",
+              "sjlabelled",
+              "Amelia",
+              "gtsummary",
+              "janitor",
+              "psych",
+              "corrplot",
+              "rstatix",
+              "networktools",
+              "nnet",
+              "bootnet",
+              "caret",
+              "Matrix",
+              "qgraph",
+              "NetworkComparisonTest",
+              "tidyverse")
+package_check(packages)
+```
+
+Retrieve recent date
+We are using the recent date to save files with paste0() as an extension to not overwrite old versions
+```{r Recent date}
+date <- Sys.Date()
+date
+```
+
+
+
+
+# Read in merged data with variables created: SYMPTOM DATA
+Read in data 
+```{r Read in data symptom}
+# Symptom dat
+symptom_dat <- readRDS(file = "../data/symptom_dat_analysis2022-03-15.rds")
+dim(symptom_dat)
+colnames(symptom_dat)
+
+# Select and rename variables
+symptom_dat <- symptom_dat %>%
+  select(
+    ID,
+    sample,
+    cohort,
+    age = age_sx_level,
+    sex = sex_final,
+    sex_numeric = sex_final_numeric,
+    ethnicity,
+    highest_education = highest_education_sx_level,
+    bmi_signup = bmi_signup_sx_level,
+    bmi_lowest =bmi_lowest_sx_level,
+    bmi_highest = bmi_highest_sx_level,
+    racially_minoritised,
+   # bipolar_disorder_final,
+    more_hyperactivity = more_hyperactivity_sx_level,
+    more_irritability= more_irritability_sx_level,
+    more_self_confidence = more_self_confidence_sx_level,
+    less_sleep = less_sleep_sx_level,                    
+    more_talkative = more_talkative_sx_level,
+    racing_thoughts = racing_thoughts_sx_level,
+    conc_difficulties = conc_difficulties_sx_level,    
+    more_energy = more_energy_sx_level,
+    more_active = more_active_sx_level,
+    more_social = more_social_sx_level,             
+    higher_libido = higher_libido_sx_level,
+    more_risky_beh = more_risky_beh_sx_level,
+    reckless_spending = reckless_spending_sx_level,
+   
+    more_hyperactivity_numeric = more_hyperactivity_numeric_sx_level,
+   more_irritability_numeric= more_irritability_numeric_sx_level,
+   more_self_confidence_numeric = more_self_confidence_numeric_sx_level,
+   less_sleep_numeric = less_sleep_numeric_sx_level,                    
+   more_talkative_numeric = more_talkative_numeric_sx_level,
+   racing_thoughts_numeric = racing_thoughts_numeric_sx_level,
+   conc_difficulties_numeric = conc_difficulties_numeric_sx_level,     
+   more_energy_numeric = more_energy_numeric_sx_level,
+   more_active_numeric = more_active_numeric_sx_level,
+   more_social_numeric = more_social_numeric_sx_level,             
+   higher_libido_numeric = higher_libido_numeric_sx_level,
+   more_risky_beh_numeric = more_risky_beh_numeric_sx_level,
+   reckless_spending_numeric = reckless_spending_numeric_sx_level,
+   
+   binge_eating_with_loss_control,
+   binge_eating_with_loss_control_numeric
+    ) 
+
+# Only want to compare BE loss of control with no BE (set BE no loss of control to NA)
+symptom_dat <- symptom_dat %>%
+  mutate(binge_eating_with_loss_control =
+    case_when(binge_eating_with_loss_control == "BE loss control" ~ "BE loss control",
+         binge_eating_with_loss_control == "No BE" ~ "No BE",
+         TRUE ~ NA_character_
+          )
+  )
+
+symptom_dat <- symptom_dat %>%
+  filter(!is.na(binge_eating_with_loss_control))
+
+# Check which sample
+symptom_dat %>%
+  freq(sample)
+# Check which cohort
+symptom_dat %>%
+  freq(cohort)
+```
+
+```{r create AS levels or higher variable symptom dat}
+# Check response options
+symptom_dat %>%
+  freq(highest_education)
+
+# Create A levels or higher variable
+symptom_dat <- symptom_dat %>%
+  mutate(AS_Levels_higher =
+           case_when(highest_education == "None of the above"  |
+                       highest_education == "GCSEs/CSEs/O-levels or equivalent"  |
+                       highest_education == "NVQ/HND/HNC or equivalent"  ~ "No",
+                    
+                     highest_education == "A-levels/AS-levels or equivalent" |
+                       highest_education == "University" ~ "Yes"
+                    )
+         )
+
+# Check response options
+symptom_dat %>%
+  freq(AS_Levels_higher)
+```
+
+```{r checking Ns of people with at least one mania symptom endorsement}
+symptom_dat %>%
+   filter(binge_eating_with_loss_control == "BE loss control") %>%
+  filter(
+    more_hyperactivity_numeric == 1 |
+    more_irritability_numeric== 1 |
+    more_self_confidence_numeric== 1 |
+    less_sleep_numeric== 1 |                    
+    more_talkative_numeric== 1 |   
+    racing_thoughts_numeric== 1 |  
+    conc_difficulties_numeric== 1 |     
+    more_energy_numeric== 1 |
+    more_active_numeric== 1 | 
+    more_social_numeric== 1 |               
+    higher_libido_numeric== 1 |  
+    more_risky_beh_numeric== 1 |  
+    reckless_spending_numeric == 1) %>%
+  nrow()
+
+symptom_dat %>%
+   filter(binge_eating_with_loss_control == "No BE") %>%
+  filter(
+    more_hyperactivity_numeric == 1 |
+    more_irritability_numeric== 1 |
+    more_self_confidence_numeric== 1 |
+    less_sleep_numeric== 1 |                    
+    more_talkative_numeric== 1 |   
+    racing_thoughts_numeric== 1 |  
+    conc_difficulties_numeric== 1 |     
+    more_energy_numeric== 1 |
+    more_active_numeric== 1 | 
+    more_social_numeric== 1 |               
+    higher_libido_numeric== 1 |  
+    more_risky_beh_numeric== 1 |  
+    reckless_spending_numeric == 1) %>%
+  nrow()
+```
+
+```{r create BE datasets symptom}
+BE_loss_control <- symptom_dat %>%
+   filter(binge_eating_with_loss_control == "BE loss control") %>%
+  select(
+   more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric,
+   sex_numeric,
+   age,
+   sex,
+    ethnicity,
+    bmi_signup,
+    bmi_lowest,
+    bmi_highest,
+   racially_minoritised,
+   AS_Levels_higher
+  )
+
+
+no_BE <- symptom_dat %>%
+   filter(binge_eating_with_loss_control == "No BE") %>%
+  select(
+   more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric,
+   sex_numeric,
+   age,
+   sex,
+    ethnicity,
+    bmi_signup,
+    bmi_lowest,
+    bmi_highest,
+   racially_minoritised,
+   AS_Levels_higher
+  )
+```
+
+```{r recode factors to ensure symptom plot is generated correctly symptom}
+symptom_dat <- symptom_dat %>%
+  mutate(more_hyperactivity = factor(more_hyperactivity,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_irritability = factor(more_irritability,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_self_confidence = factor(more_self_confidence,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(less_sleep = factor(less_sleep,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+symptom_dat <- symptom_dat %>%
+  mutate(racing_thoughts = factor(racing_thoughts,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+symptom_dat <- symptom_dat %>%
+  mutate(conc_difficulties = factor(conc_difficulties,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_energy = factor(more_energy,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_energy = factor(more_energy,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_active = factor(more_active,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_social = factor(more_social,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(higher_libido = factor(higher_libido,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_risky_beh = factor(more_risky_beh,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(reckless_spending = factor(reckless_spending,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+```
+
+# Descriptives
+# ggplot theme
+Set up ggplot theme for the plots
+```{r ggplot theme symptom}
+theme_personal <-  theme(
+    text = element_text(color = "black"),
+    axis.title = element_text(color = "black"),
+    axis.text = element_text(color = "black"),
+    axis.title.y = element_blank(), 
+    legend.background = element_blank(),
+    legend.box.background = element_blank(),
+    panel.background = element_blank(), 
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_line(
+      colour = "gray",
+      linetype = "dashed",
+      size = 0.2
+      ),
+    axis.ticks = element_blank()
+    )
+```
+
+# Colour-blind palette
+```{r Colour-blind friendly palette symptom}
+cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+pallette_tom <- c(
+  "lightskyblue3",
+# "lightgoldenrod1", 
+  "lightpink4",
+  "firebrick3", 
+  "orange1"
+  )
+```
+
+# Transform data to long format - diagnosis data 
+```{r Transform to long format symptom}
+symptom_dat_long <- symptom_dat %>%
+  select(
+    ID,
+    age,
+    sex,
+    racially_minoritised,
+    bmi_signup,
+    bmi_lowest,
+    bmi_highest,
+    binge_eating_with_loss_control,
+    more_hyperactivity,
+    more_irritability,
+    more_self_confidence,
+   less_sleep,                    
+   more_talkative,
+   racing_thoughts ,
+   conc_difficulties,     
+   more_energy,
+   more_active,
+   more_social,             
+   higher_libido,
+   more_risky_beh,
+   reckless_spending 
+    ) %>%
+  pivot_longer(
+    cols = c(
+      "more_hyperactivity",
+   "more_irritability",
+   "more_self_confidence",
+   "less_sleep",                    
+   "more_talkative",
+   "racing_thoughts",
+   "conc_difficulties",     
+   "more_energy",
+   "more_active",
+   "more_social",             
+   "higher_libido",
+   "more_risky_beh",
+   "reckless_spending"
+      ),
+    names_to = "Mania_symptom",
+    values_to = "Endorsement"
+    ) 
+symptom_dat_long 
+```
+
+```{r group by binge eating symptom}
+symptom_dat_long %>%
+  group_by(binge_eating_with_loss_control) %>%
+  count(Mania_symptom,
+        Endorsement)
+```
+
+# Plot - response distribution for mania symptom variables in the sample
+Plotting percentage of each group reporting mania symptoms
+```{r Mania symptom endorsement by binge eating,  fig.height=10, fig.width=10}
+png(file = paste0(filepath_plots, "/symptom/descriptives/symptom/descriptives/mania_symptom_endorsement_symp.png",
+    width = 800,
+    height = 800
+    ))
+
+
+symptom_dat_long %>% 
+  mutate(
+    mania_symptom_label =
+      recode_factor(Mania_symptom,
+                    "more_hyperactivity" =  "More hyperactivity",
+   "more_irritability"= "More irritable",    
+   "more_self_confidence"= "More self-confidence",
+   "less_sleep"= "Less sleep",                  
+   "more_talkative"= "More talkative",
+   "racing_thoughts"= "Racing thoughts",
+   "conc_difficulties" = "Concentration difficulties",     
+   "more_energy"= "More energy",
+   "more_active"= "More active",
+   "more_social"= "More social",          
+   "higher_libido" = "Higher libido",
+   "more_risky_beh"= "More risky behaviour",
+   "reckless_spending" = "Reckless spending"
+     )
+  ) %>%
+  ggplot(
+    aes(
+      y = binge_eating_with_loss_control,
+      fill = Endorsement, 
+      x = 
+      )
+    ) +
+  geom_bar(
+    position = "fill"
+    ) +
+  theme_light() +
+  theme(
+    legend.position= "none",
+    axis.title.y = element_blank(),
+     axis.title.x = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.text.x = element_text(size = 12), # size of percentages on x axis
+    strip.text = element_text(size = 13) # size of text in each facet
+) +
+  scale_fill_manual(values=c(
+    "gray75", "darkorchid2",
+    "gray75", "darkorchid2"
+    )) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+    facet_wrap(
+    facets = "mania_symptom_label",
+    nrow = 13) +
+  xlab("Percentage of mania symptom endorsement")
+
+dev.off()
+```
+
+# Categorical variables
+## Table: Endorsement rates
+```{r categorical variables symptom}
+# BE loss control
+BE_loss_control %>%
+  select(sex,
+         ethnicity,
+         AS_Levels_higher,
+         racially_minoritised,
+         more_hyperactivity_numeric,
+         more_irritability_numeric,
+         more_self_confidence_numeric,
+         less_sleep_numeric,                    
+         more_talkative_numeric,
+         racing_thoughts_numeric,
+         conc_difficulties_numeric,     
+         more_energy_numeric,
+         more_active_numeric,
+         more_social_numeric,             
+         higher_libido_numeric,
+         more_risky_beh_numeric,
+         reckless_spending_numeric
+         ) %>%
+  tbl_summary(missing_text = "Missing")
+
+# No BE
+no_BE %>%
+  select(sex,
+         ethnicity,
+         AS_Levels_higher,
+         racially_minoritised,
+         more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric
+         ) %>%
+  tbl_summary(missing_text = "Missing")
+```
+
+## Comparison of categorical variables
+### Dummy variables
+```{r list categorical dummy variables symptom}
+descriptives.columns <- c(
+  "sex",
+  "ethnicity",
+  "racially_minoritised",
+  "more_hyperactivity",
+  "more_irritability",
+  "more_self_confidence",
+  "less_sleep",                
+  "more_talkative",
+  "racing_thoughts",
+  "conc_difficulties",
+  "more_energy",
+  "more_active",
+  "more_social",  
+  "higher_libido",
+  "more_risky_beh",
+  "reckless_spending",
+  "binge_eating_with_loss_control",
+  "AS_Levels_higher"
+)
+
+descriptives.columns.dummy <- c(
+  "sex",
+  "ethnicity",
+  "racially_minoritised",
+  "more_hyperactivity",
+  "more_irritability",
+  "more_self_confidence",
+  "less_sleep",                
+  "more_talkative",
+  "racing_thoughts",
+  "conc_difficulties",
+  "more_energy",
+  "more_active",
+  "more_social",  
+  "higher_libido",
+  "more_risky_beh",
+  "reckless_spending",
+  "AS_Levels_higher"
+)
+```
+
+Dummy coding for categorical variables
+```{r dummy coding categorical variables symptom}
+# Create dataset
+descriptives_df <- symptom_dat %>%
+  select(descriptives.columns)
+
+# Dummy coding
+descriptives_dummy <- fastDummies::dummy_cols(descriptives_df,
+                                              select_columns = descriptives.columns.dummy
+                                              )
+# Check
+colnames(descriptives_dummy)
+```
+
+### Chi-squared tests
+#### Sex
+```{r chi-squared sex symptom}
+sex <- table(descriptives_dummy$binge_eating_with_loss_control,
+             descriptives_dummy$sex_Female
+             
+             )
+
+sex_chisq <- chisq.test(sex)
+
+# P value
+sex_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(sex,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Race
+```{r chi-squared race symptom}
+race <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$racially_minoritised_Yes)
+             
+
+race_chisq <- chisq.test(race)
+
+# P value
+race_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(race,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Education
+```{r chi-squared education symptom}
+edu <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$AS_Levels_higher_Yes)
+  
+edu_chisq <- chisq.test(edu)
+
+# P value
+edu_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(edu,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More hyperactivity
+```{r chi-squared more hyperactivity symptom}
+hyperactivity <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_hyperactivity_Yes)
+             
+
+hyperactivity_chisq <- chisq.test(hyperactivity)
+
+# P value
+hyperactivity_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(hyperactivity,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More irritability
+```{r chi-squared more irritability}
+irritability <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_irritability_Yes)
+             
+
+irritability_chisq <- chisq.test(irritability)
+
+# P value
+p <- irritability_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(irritability,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More self confidence
+```{r chi-squared more self_confidence symptom}
+self_confidence <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_self_confidence_Yes)
+             
+
+self_confidence_chisq <- chisq.test(self_confidence)
+
+# P value
+self_confidence_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(self_confidence,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Less sleep
+```{r chi-squared more less_sleep symptom}
+less_sleep <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$less_sleep_Yes)
+             
+
+less_sleep_chisq <- chisq.test(less_sleep)
+
+# P value
+less_sleep_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(less_sleep,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More talkative
+```{r chi-squared more talkative symptom}
+more_talkative <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_talkative_Yes)
+             
+
+more_talkative_chisq <- chisq.test(more_talkative)
+
+# P value
+more_talkative_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_talkative,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Racing thoughts
+```{r chi-squared racing_thoughts symptom}
+racing_thoughts <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$racing_thoughts_Yes)
+             
+
+racing_thoughts_chisq <- chisq.test(racing_thoughts)
+
+# P value
+racing_thoughts_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(racing_thoughts,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Concentration difficulties
+```{r chi-squared conc_difficulties symptom}
+conc_difficulties <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$conc_difficulties_Yes)
+             
+
+conc_difficulties_chisq <- chisq.test(conc_difficulties)
+
+# P value
+conc_difficulties_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(conc_difficulties,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+  
+#### More energy
+```{r chi-squared more_energy symptom}
+more_energy <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_energy_Yes)
+             
+
+more_energy_chisq <- chisq.test(more_energy)
+
+# P value
+more_energy_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_energy,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More active
+```{r chi-squared more_active symptom}
+more_active <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_active_Yes)
+             
+
+more_active_chisq <- chisq.test(more_active)
+
+# P value
+more_active_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_active,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More social
+```{r chi-squared more_social symptom}
+more_social <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_social_Yes)
+             
+
+more_social_chisq <- chisq.test(more_social)
+
+# P value
+more_social_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_social,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Higher libido
+```{r chi-squared higher_libido symptom}
+higher_libido <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$higher_libido_Yes)
+             
+
+higher_libido_chisq <- chisq.test(higher_libido)
+
+# P value
+higher_libido_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(higher_libido,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More risky behaviour
+```{r chi-squared more_risky_beh symptom}
+more_risky_beh <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_risky_beh_Yes)
+             
+
+more_risky_beh_chisq <- chisq.test(more_risky_beh)
+
+# P value
+more_risky_beh_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_risky_beh,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Reckless spending
+```{r chi-squared reckless_spending symptom}
+reckless_spending <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$reckless_spending_Yes)
+             
+
+reckless_spending_chisq <- chisq.test(reckless_spending)
+
+# P value
+more_risky_beh_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(reckless_spending,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+# Continious variables
+## Generate mode function
+```{r mode function symptom}
+mode_func <- function(x, na.rm = FALSE) {
+  if(na.rm){
+    x = x[!is.na(x)]
+  }
+
+  ux <- unique(x)
+  return(ux[which.max(tabulate(match(x, ux)))])
+}
+```
+
+## Table: Comparison of continuous variables
+```{r table compare continuous variables symptom}
+# Create table
+numeric_table <- symptom_dat %>% 
+  group_by(binge_eating_with_loss_control) %>%
+  summarise_at(vars(age,
+                    bmi_signup,
+                    bmi_lowest,
+                    bmi_highest),
+    .funs =
+      list(
+        ~mean(., na.rm = T),
+        ~sd(., na.rm = T),
+        ~IQR(., na.rm=T),
+        mode = ~mode_func(., na.rm = T),
+        ~median(., na.rm = T),
+        ~min(., na.rm = T),
+        ~max(., na.rm = T),
+        missing = ~skimr::n_missing(.),
+        ~skew(., na.rm = T),
+        kurtosis = ~kurtosi(., na.rm = T)
+      )
+  )
+
+numeric_table
+```
+
+## T-tests (or non-parametric equivalent): SYMPTOM DATA
+```{r create test groups to assess parametric assumptions symptom}
+BE <- symptom_dat %>%
+  filter(binge_eating_with_loss_control == "BE loss control")
+
+no_BE <- symptom_dat %>%
+  filter(binge_eating_with_loss_control == "No BE")
+```
+
+### Age
+#### Age: Testing normality: Histogram and qqplot
+NB: There are also specific methods for testing normality but these should be used in conjunction with either a histogram or a Q-Q plot. The Kolmogorov-Smirnov test and the Shapiro-Wilk’s W test whether the underlying distribution is normal. BUT Both tests are sensitive to outliers and are influenced by sample size (i..e, more suitable to smaller sample sizes, e.g., Shapiro wilks needs a sample between 3 and 5000 to work in R). https://bookdown.org/danbarch/psy_207_advanced_stats_I/assumptions-of-parametric-tests.html
+```{r Check normality of age symptom}
+# QQ plot of both
+png(file = paste0(filepath_plots, "/symptom/descriptives/all_age_qqplot_symp.png"))
+
+ggpubr::ggqqplot(symptom_dat,
+         "age",
+         facet.by = "binge_eating_with_loss_control")
+
+dev.off()
+
+age_BE_qqplot <- ggpubr::ggqqplot(symptom_dat,
+         "age",
+         facet.by = "binge_eating_with_loss_control")
+
+# QQ plot no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/BE_age_qqplot_symp.png"))
+
+qqnorm(BE$age,
+       pch = 1,
+       frame = FALSE)
+qqline(BE$age,
+       col = "steelblue",
+       lwd = 2)
+
+dev.off()
+
+# QQ plot no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/no_BE_age_qqplot_symp.png"))
+
+qqnorm(no_BE$age,
+       pch = 1,
+       frame = FALSE)
+qqline(no_BE$age,
+       col = "steelblue",
+       lwd = 2)
+
+dev.off()
+
+# Histogram of age BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/BE_age_histogram_symp.png"))
+
+BE %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of age in binge eating group") +
+  xlab("Age")
+
+dev.off()
+
+BE_histogram <- BE %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of age in binge eating group") +
+  xlab("Age")
+
+# Histogram of age no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/no_BE_age_histogram_symp.png"))
+
+no_BE %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of age in no binge eating group") +
+  xlab("Age")
+
+dev.off()
+
+no_BE_histogram <- no_BE %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of age in no binge eating group") +
+  xlab("Age")
+```
+
+```{r age formatting plots for manuscript}
+age_BE_qqplot <- BE %>%
+  ggplot(mapping = aes(sample = age)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (age)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+age_BE_histogram <- BE %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Age") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+age_no_BE_qqplot <- no_BE %>%
+  ggplot(mapping = aes(sample = age)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (age)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+age_no_BE_histogram <- no_BE %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Age") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+png(file = paste0(filepath_plots, "/symptom/descriptives/formatted_age_qqplot_symp.png"))
+
+ggpubr::ggarrange(age_BE_qqplot,
+          age_BE_histogram,
+          age_no_BE_qqplot,
+          age_no_BE_histogram,
+          labels = c("Binge eating", "", "No binge eating", ""),
+          ncol = 2, nrow = 2)
+
+dev.off()
+```
+
+#### Age: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of age symptom}
+car::leveneTest(age ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+```
+
+##### Age: Both assumptions violated; so performed the non-parametric equivalent of t-test: Mann-Whitney
+```{r independent 2-group Mann-Whitney U test age symptom}
+age_wilcox <- wilcox.test(symptom_dat$age ~symptom_dat$binge_eating_with_loss_control,
+            correct = FALSE,
+            exact = FALSE)
+
+
+print(age_wilcox$p.value)
+```
+
+### BMI signup
+#### BMI signup: Testing normality: Histogram and qqplot
+```{r Check normality of bmi_signup symptom}
+# QQ plot of both
+png(file = paste0(filepath_plots, "/symptom/descriptives/all_bmi_signup_qqplot_symp.png"))
+
+ggpubr::ggqqplot(symptom_dat,
+         "bmi_signup",
+         facet.by = "binge_eating_with_loss_control")
+
+dev.off()
+
+# QQ plot no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/BE_bmi_signup_qqplot_symp.png"))
+
+qqnorm(BE$bmi_signup,
+       pch = 1,
+       frame = FALSE)
+qqline(BE$bmi_signup,
+       col = "steelblue",
+       lwd = 2)
+
+
+dev.off()
+
+# QQ plot no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/no_BE_bmi_signup_qqplot_symp.png"))
+
+qqnorm(no_BE$bmi_signup,
+       pch = 1,
+       frame = FALSE)
+qqline(no_BE$bmi_signup,
+       col = "steelblue",
+       lwd = 2)
+
+dev.off()
+
+# Histogram of bmi_signup BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/BE_bmi_signup_histogram_symp.png"))
+
+BE %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of signup BMI in binge eating group") +
+  xlab("bmi_signup")
+
+dev.off()
+
+# Histogram of bmi_signup no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/no_BE_bmi_signup_histogram_symp.png"))
+
+no_BE %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of signup BMI in no binge eating group") +
+  xlab("bmi_signup")
+
+dev.off()
+```
+```{r bmi_signup formatting plots for manuscript}
+bmi_signup_BE_qqplot <- BE %>%
+  ggplot(mapping = aes(sample = bmi_signup)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (signup BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_signup_BE_histogram <- BE %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Signup BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+bmi_signup_no_BE_qqplot <- no_BE %>%
+  ggplot(mapping = aes(sample = bmi_signup)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (signup BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_signup_no_BE_histogram <- no_BE %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Signup BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+png(file = paste0(filepath_plots, "/symptom/descriptives/formatted_bmi_signup_qqplot_symp.png"))
+
+ggpubr::ggarrange(bmi_signup_BE_qqplot,
+          bmi_signup_BE_histogram,
+          bmi_signup_no_BE_qqplot,
+          bmi_signup_no_BE_histogram,
+          labels = c("Binge eating",
+                     "",
+                     "No binge eating",
+                     ""),
+          ncol = 2, nrow = 2)
+
+dev.off()
+```
+
+#### BMI signup: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of bmi_signup symptom}
+car::leveneTest(bmi_signup ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+```
+
+##### BMI signup: Both assumptions violated; so performed the non-parametric equivalent of t-test: Mann-Whitney
+```{r independent 2-group Mann-Whitney U test bmi_signup symptom}
+bmi_signup_wilcox <- wilcox.test(symptom_dat$bmi_signup ~ symptom_dat$binge_eating_with_loss_control,
+            correct = FALSE,
+            exact = FALSE)
+
+
+print(bmi_signup_wilcox)
+```
+### BMI lowest
+#### BMI lowest: Testing normality: Histogram and qqplot
+```{r Check normality of bmi_lowest symptom}
+# QQ plot of both
+png(file = paste0(filepath_plots, "/symptom/descriptives/all_bmi_lowest_qqplot_symp.png"))
+
+ggpubr::ggqqplot(symptom_dat,
+         "bmi_lowest",
+         facet.by = "binge_eating_with_loss_control")
+
+dev.off()
+
+# QQ plot no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/BE_bmi_lowest_qqplot_symp.png"))
+
+qqnorm(BE$bmi_lowest,
+       pch = 1,
+       frame = FALSE)
+qqline(BE$bmi_lowest,
+       col = "steelblue",
+       lwd = 2)
+
+
+dev.off()
+
+# QQ plot no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/no_BE_bmi_lowest_qqplot_symp.png"))
+
+qqnorm(no_BE$bmi_lowest,
+       pch = 1,
+       frame = FALSE)
+qqline(no_BE$bmi_lowest,
+       col = "steelblue",
+       lwd = 2)
+
+dev.off()
+
+# Histogram of bmi_lowest BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/BE_bmi_lowest_histogram_symp.png"))
+
+BE %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of lowest BMI in binge eating group") +
+  xlab("bmi_lowest")
+
+dev.off()
+
+# Histogram of bmi_lowest no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/no_BE_bmi_lowest_histogram_symp.png"))
+
+no_BE %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of lowest BMI in no binge eating group") +
+  xlab("bmi_lowest")
+
+dev.off()
+```
+
+```{r bmi_lowest formatting plots for manuscript}
+bmi_lowest_BE_qqplot <- BE %>%
+  ggplot(mapping = aes(sample = bmi_lowest)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (lowest BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_lowest_BE_histogram <- BE %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Lowest BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+bmi_lowest_no_BE_qqplot <- no_BE %>%
+  ggplot(mapping = aes(sample = bmi_lowest)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (lowest BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_lowest_no_BE_histogram <- no_BE %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Lowest BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+png(file = paste0(filepath_plots, "/symptom/descriptives/formatted_bmi_lowest_qqplot_symp.png"))
+
+ggpubr::ggarrange(bmi_lowest_BE_qqplot,
+          bmi_lowest_BE_histogram,
+          bmi_lowest_no_BE_qqplot,
+          bmi_lowest_no_BE_histogram,
+          labels = c("Binge eating",
+                     "",
+                     "No binge eating",
+                     ""),
+          ncol = 2, nrow = 2)
+
+dev.off()
+```
+
+#### BMI lowest: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of bmi_lowest symptom}
+car::leveneTest(bmi_lowest ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+```
+
+##### BMI lowest: Both assumptions violated; so performed the non-parametric equivalent of t-test: Mann-Whitney
+```{r independent 2-group Mann-Whitney U test bmi_lowest symptom}
+bmi_lowest_wilcox <- wilcox.test(symptom_dat$bmi_lowest ~ symptom_dat$binge_eating_with_loss_control,
+            correct = FALSE,
+            exact = FALSE)
+
+
+print(bmi_lowest_wilcox)
+```
+
+### BMI highest
+#### BMI highest: Testing normality: Histogram and qqplot
+```{r Check normality of bmi_highest symptom}
+# QQ plot of both
+png(file = paste0(filepath_plots, "/symptom/descriptives/all_bmi_highest_qqplot_symp.png"))
+
+ggpubr::ggqqplot(symptom_dat,
+         "bmi_highest",
+         facet.by = "binge_eating_with_loss_control")
+
+dev.off()
+
+# QQ plot no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/BE_bmi_highest_qqplot_symp.png"))
+
+qqnorm(BE$bmi_highest,
+       pch = 1,
+       frame = FALSE)
+qqline(BE$bmi_highest,
+       col = "steelblue",
+       lwd = 2)
+
+
+dev.off()
+
+# QQ plot no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/no_BE_bmi_highest_qqplot_symp.png"))
+
+qqnorm(no_BE$bmi_highest,
+       pch = 1,
+       frame = FALSE)
+qqline(no_BE$bmi_highest,
+       col = "steelblue",
+       lwd = 2)
+
+dev.off()
+
+# Histogram of bmi_highest BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/BE_bmi_highest_histogram_symp.png"))
+
+BE %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of highest BMI in binge eating group") +
+  xlab("bmi_highest")
+
+dev.off()
+
+# Histogram of bmi_highest no BE
+png(file = paste0(filepath_plots, "/symptom/descriptives/no_BE_bmi_highest_histogram_symp.png"))
+
+no_BE %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of highest BMI in no binge eating group") +
+  xlab("bmi_highest")
+
+dev.off()
+```
+```{r bmi_highest formatting plots for manuscript}
+bmi_highest_BE_qqplot <- BE %>%
+  ggplot(mapping = aes(sample = bmi_highest)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (highest BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_highest_BE_histogram <- BE %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Highest BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+bmi_highest_no_BE_qqplot <- no_BE %>%
+  ggplot(mapping = aes(sample = bmi_highest)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (highest BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_highest_no_BE_histogram <- no_BE %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Highest BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+png(file = paste0(filepath_plots, "/symptom/descriptives/formatted_bmi_highest_qqplot_symp.png"))
+
+ggpubr::ggarrange(bmi_highest_BE_qqplot,
+          bmi_highest_BE_histogram,
+          bmi_highest_no_BE_qqplot,
+          bmi_highest_no_BE_histogram,
+          labels = c("Binge eating",
+                     "",
+                     "No binge eating",
+                     ""),
+          ncol = 2, nrow = 2)
+
+dev.off()
+```
+
+#### BMI highest: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of bmi_highest symptom}
+car::leveneTest(bmi_highest ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+```
+
+##### BMI highest: Both assumptions violated; so performed the non-parametric equivalent of t-test: Mann-Whitney
+```{r independent 2-group Mann-Whitney U test bmi_highest symptom}
+bmi_highest_wilcox <- wilcox.test(symptom_dat$bmi_highest ~ symptom_dat$binge_eating_with_loss_control,
+            correct = FALSE,
+            exact = FALSE)
+
+
+print(bmi_highest_wilcox)
+```
+
+# Read in merged data with variables created: DIAGNOSIS DATA
+Read in data 
+```{r Read in data diagnosis}
+# Diagnosis dat
+diagnosis_dat <- readRDS(file = "../data/diagnosis_dat_analysis2022-03-15.rds")
+dim(diagnosis_dat)
+colnames(diagnosis_dat)
+
+# Select and rename variables
+diagnosis_dat <- diagnosis_dat %>%
+  select(
+    ID,
+    age = age_dx_level,
+    sex = sex_final,
+    sex_numeric = sex_final_numeric,
+    ethnicity,
+    highest_education = highest_education_dx_level,
+    bmi_signup = bmi_signup_dx_level,
+    bmi_lowest =bmi_lowest_dx_level,
+    bmi_highest = bmi_highest_dx_level,
+    racially_minoritised,
+   # bipolar_disorder_final,
+    more_hyperactivity = more_hyperactivity_dx_level,
+    more_irritability= more_irritability_dx_level,
+    more_self_confidence = more_self_confidence_dx_level,
+    less_sleep = less_sleep_dx_level,                    
+    more_talkative = more_talkative_dx_level,
+    racing_thoughts = racing_thoughts_dx_level,
+    conc_difficulties = conc_difficulties_dx_level,    
+    more_energy = more_energy_dx_level,
+    more_active = more_active_dx_level,
+    more_social = more_social_dx_level,             
+    higher_libido = higher_libido_dx_level,
+    more_risky_beh = more_risky_beh_dx_level,
+    reckless_spending = reckless_spending_dx_level,
+   
+   more_hyperactivity_numeric = more_hyperactivity_numeric_dx_level,
+    more_irritability_numeric= more_irritability_numeric_dx_level,
+    more_self_confidence_numeric = more_self_confidence_numeric_dx_level,
+    less_sleep_numeric = less_sleep_numeric_dx_level,                    
+    more_talkative_numeric = more_talkative_numeric_dx_level,
+    racing_thoughts_numeric = racing_thoughts_numeric_dx_level,
+    conc_difficulties_numeric = conc_difficulties_numeric_dx_level,    
+    more_energy_numeric = more_energy_numeric_dx_level,
+    more_active_numeric = more_active_numeric_dx_level,
+    more_social_numeric = more_social_numeric_dx_level,             
+    higher_libido_numeric = higher_libido_numeric_dx_level,
+    more_risky_beh_numeric = more_risky_beh_numeric_dx_level,
+    reckless_spending_numeric = reckless_spending_numeric_dx_level,
+   
+   ED_hierarchical,
+   ED_hierarchical_numeric
+    ) 
+
+# Only want to compare those with EDs
+diagnosis_dat <- diagnosis_dat %>%
+  filter(!is.na(ED_hierarchical))
+```
+
+```{r create AS levels or higher variable diagnosis dat}
+# Check response options
+diagnosis_dat %>%
+  freq(highest_education)
+
+# Create A levels or higher variable
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(AS_Levels_higher =
+           case_when(highest_education == "None of the above"  |
+                       highest_education == "GCSEs/CSEs/O-levels or equivalent"  |
+                       highest_education == "NVQ/HND/HNC or equivalent"  ~ "No",
+                    
+                     highest_education == "A-levels/AS-levels or equivalent" |
+                       highest_education == "University" ~ "Yes"
+                    )
+         )
+
+# Check response options
+diagnosis_dat %>%
+  freq(AS_Levels_higher)
+```
+
+```{r checking Ns of people with at least one mania symptom endorsement}
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  filter(
+    more_hyperactivity_numeric == 1 |
+    more_irritability_numeric== 1 |
+    more_self_confidence_numeric== 1 |
+    less_sleep_numeric== 1 |                    
+    more_talkative_numeric== 1 |   
+    racing_thoughts_numeric== 1 |  
+    conc_difficulties_numeric== 1 |     
+    more_energy_numeric== 1 |
+    more_active_numeric== 1 | 
+    more_social_numeric== 1 |               
+    higher_libido_numeric== 1 |  
+    more_risky_beh_numeric== 1 |  
+    reckless_spending_numeric == 1) %>%
+  nrow()
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  filter(
+    more_hyperactivity_numeric == 1 |
+    more_irritability_numeric== 1 |
+    more_self_confidence_numeric== 1 |
+    less_sleep_numeric== 1 |                    
+    more_talkative_numeric== 1 |   
+    racing_thoughts_numeric== 1 |  
+    conc_difficulties_numeric== 1 |     
+    more_energy_numeric== 1 |
+    more_active_numeric== 1 | 
+    more_social_numeric== 1 |               
+    higher_libido_numeric== 1 |  
+    more_risky_beh_numeric== 1 |  
+    reckless_spending_numeric == 1) %>%
+  nrow()
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  filter(
+    more_hyperactivity_numeric == 1 |
+    more_irritability_numeric== 1 |
+    more_self_confidence_numeric== 1 |
+    less_sleep_numeric== 1 |                    
+    more_talkative_numeric== 1 |   
+    racing_thoughts_numeric== 1 |  
+    conc_difficulties_numeric== 1 |     
+    more_energy_numeric== 1 |
+    more_active_numeric== 1 | 
+    more_social_numeric== 1 |               
+    higher_libido_numeric== 1 |  
+    more_risky_beh_numeric== 1 |  
+    reckless_spending_numeric == 1) %>%
+  nrow()
+```
+
+```{r recode factors to ensure diagnosis plot is generated correctly}
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(more_hyperactivity = factor(more_hyperactivity,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(more_irritability = factor(more_irritability,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(more_self_confidence = factor(more_self_confidence,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(less_sleep = factor(less_sleep,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(racing_thoughts = factor(racing_thoughts,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(conc_difficulties = factor(conc_difficulties,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(more_energy = factor(more_energy,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(more_energy = factor(more_energy,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(more_active = factor(more_active,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(more_social = factor(more_social,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(higher_libido = factor(higher_libido,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(more_risky_beh = factor(more_risky_beh,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(reckless_spending = factor(reckless_spending,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+# Re-order ED hierarchical 
+diagnosis_dat <- diagnosis_dat %>%
+  mutate(ED_hierarchical = factor(ED_hierarchical,
+                       levels = c( "Binge-eating disorder",
+                                    "Bulimia nervosa",
+                                   "Anorexia binge-eating/purging"
+                                   )
+                       )
+         )
+```
+
+# Descriptives
+# ggplot theme
+Set up ggplot theme for the plots
+```{r ggplot theme diagnosis}
+theme_personal <-  theme(
+    text = element_text(color = "black"),
+    axis.title = element_text(color = "black"),
+    axis.text = element_text(color = "black"),
+    axis.title.y = element_blank(), 
+    legend.background = element_blank(),
+    legend.box.background = element_blank(),
+    panel.background = element_blank(), 
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_line(
+      colour = "gray",
+      linetype = "dashed",
+      size = 0.2
+      ),
+    axis.ticks = element_blank()
+    )
+```
+
+# Colour-blind palette
+```{r Colour-blind friendly palette diagnosis}
+cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+pallette_tom <- c(
+  "lightskyblue3",
+# "lightgoldenrod1", 
+  "lightpink4",
+  "firebrick3", 
+  "orange1"
+  )
+```
+
+# Transform data to long format - diagnosis data 
+```{r Transform to long format diagnosis}
+diagnosis_dat_long <- diagnosis_dat %>%
+  select(
+    ID,
+    age,
+    sex,
+    racially_minoritised,
+    bmi_signup,
+    bmi_lowest,
+    bmi_highest,
+    ED_hierarchical,
+    more_hyperactivity,
+   more_irritability,
+   more_self_confidence,
+   less_sleep,                    
+   more_talkative,
+   racing_thoughts ,
+   conc_difficulties,     
+   more_energy,
+   more_active,
+   more_social,             
+   higher_libido,
+   more_risky_beh,
+   reckless_spending 
+    ) %>%
+  pivot_longer(
+    cols = c(
+      "more_hyperactivity",
+   "more_irritability",
+   "more_self_confidence",
+   "less_sleep",                    
+   "more_talkative",
+   "racing_thoughts",
+   "conc_difficulties",     
+   "more_energy",
+   "more_active",
+   "more_social",             
+   "higher_libido",
+   "more_risky_beh",
+   "reckless_spending"
+      ),
+    names_to = "Mania_diagnosis",
+    values_to = "Endorsement"
+    ) 
+diagnosis_dat_long 
+```
+
+```{r group by eating disorder diagnosis}
+diagnosis_dat_long %>%
+  group_by(ED_hierarchical) %>%
+  count(Mania_diagnosis,
+        Endorsement)
+```
+
+# Plot - response distribution for mania diagnosis variables in the sample
+Plotting percentage of each group reporting mania diagnosiss
+```{r Mania diagnosis endorsement by eating disorder diagnoses,  fig.height=10, fig.width=10}
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/mania_symptom_endorsement_diag.png",
+    width = 800,
+    height = 800))
+
+diagnosis_dat_long %>% 
+  mutate(
+    mania_diagnosis_label =
+      recode_factor(Mania_diagnosis,
+                    "more_hyperactivity" =  "More hyperactivity",
+   "more_irritability"= "More irritable",    
+   "more_self_confidence"= "More self-confidence",
+   "less_sleep"= "Less sleep",                  
+   "more_talkative"= "More talkative",
+   "racing_thoughts"= "Racing thoughts",
+   "conc_difficulties" = "Concentration difficulties",     
+   "more_energy"= "More energy",
+   "more_active"= "More active",
+   "more_social"= "More social",          
+   "higher_libido" = "Higher libido",
+   "more_risky_beh"= "More risky behaviour",
+   "reckless_spending" = "Reckless spending"
+     )
+  ) %>%
+  ggplot(
+    aes(
+      y = ED_hierarchical,
+      fill = Endorsement
+      )
+    ) +
+  geom_bar(
+    position = "fill"
+    ) +
+  theme_light() +
+  theme(
+    legend.position= "none",
+    axis.title.y = element_blank(),
+    axis.title.x = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.text.x = element_text(size = 12), # size of percentages on x axis
+    strip.text = element_text(size = 13) # size of text in each facet
+    ) +
+  scale_fill_manual(values=c(
+    "gray75", "darkorchid2",
+    "gray75", "darkorchid2"
+    )) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+    facet_wrap(
+    facets = "mania_diagnosis_label",
+    nrow = 13) +
+  xlab("Percentage of mania symptom endorsement")
+
+dev.off()
+```
+
+# Categorical variables
+## Table: Endorsement rates
+```{r categorical variables diagnosis}
+# ANBP
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  select(sex,
+         ethnicity,
+         racially_minoritised,
+         AS_Levels_higher,
+        more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric
+         ) %>%
+  tbl_summary(missing_text = "Missing")
+
+# BN
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  select(sex,
+         ethnicity,
+         racially_minoritised,
+         AS_Levels_higher,
+        more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric
+         ) %>%
+  tbl_summary(missing_text = "Missing")
+
+# BED
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  select(sex,
+         ethnicity,
+         racially_minoritised,
+         AS_Levels_higher,
+        more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric
+         ) %>%
+  tbl_summary(missing_text = "Missing")
+```
+
+## Comparison of categorical variables
+### Dummy variables
+```{r list categorical dummy variables diagnosis}
+descriptives.columns <- c(
+  "sex",
+  "ethnicity",
+  "racially_minoritised",
+  "more_hyperactivity",
+  "more_irritability",
+  "more_self_confidence",
+  "less_sleep",                
+  "more_talkative",
+  "racing_thoughts",
+  "conc_difficulties",
+  "more_energy",
+  "more_active",
+  "more_social",  
+  "higher_libido",
+  "more_risky_beh",
+  "reckless_spending",
+  "ED_hierarchical",
+  "AS_Levels_higher"
+)
+
+descriptives.columns.dummy <- c(
+  "sex",
+  "ethnicity",
+  "racially_minoritised",
+  "more_hyperactivity",
+  "more_irritability",
+  "more_self_confidence",
+  "less_sleep",                
+  "more_talkative",
+  "racing_thoughts",
+  "conc_difficulties",
+  "more_energy",
+  "more_active",
+  "more_social",  
+  "higher_libido",
+  "more_risky_beh",
+  "reckless_spending",
+  "AS_Levels_higher"
+)
+```
+
+Dummy coding for categorical variables
+```{r dummy coding categorical variables diagnosis}
+# Create dataset
+descriptives_df <- diagnosis_dat %>%
+  select(descriptives.columns)
+
+# Dummy coding
+descriptives_dummy <- fastDummies::dummy_cols(descriptives_df,
+                                              select_columns = descriptives.columns.dummy
+                                              )
+# Check
+colnames(descriptives_dummy)
+```
+
+### Chi-squared tests
+#### Sex
+```{r chi-squared sex diagnosis}
+sex <- table(descriptives_dummy$ED_hierarchical,
+             descriptives_dummy$sex_Female
+             
+             )
+
+sex_chisq <- chisq.test(sex)
+
+# P value
+sex_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(sex,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Race
+```{r chi-squared race diagnosis}
+race <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$racially_minoritised_Yes)
+             
+
+race_chisq <- chisq.test(race)
+
+# P value
+race_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(race,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Education
+```{r chi-squared education diagnosis}
+edu <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$AS_Levels_higher_Yes)
+             
+
+edu_chisq <- chisq.test(edu)
+
+# P value
+edu_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(edu,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More hyperactivity
+```{r chi-squared more hyperactivity diagnosis}
+hyperactivity <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$more_hyperactivity_Yes)
+             
+
+hyperactivity_chisq <- chisq.test(hyperactivity)
+
+# P value
+hyperactivity_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(hyperactivity,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More irritability
+```{r chi-squared more irritability diagnosis}
+irritability <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$more_irritability_Yes)
+             
+
+irritability_chisq <- chisq.test(irritability)
+
+# P value
+irritability_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(irritability,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More self confidence
+```{r chi-squared more self_confidence diagnosis}
+self_confidence <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$more_self_confidence_Yes)
+             
+
+self_confidence_chisq <- chisq.test(self_confidence)
+
+# P value
+self_confidence_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(self_confidence,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Less sleep
+```{r chi-squared more less_sleep diagnosis}
+less_sleep <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$less_sleep_Yes)
+             
+
+less_sleep_chisq <- chisq.test(less_sleep)
+
+# P value
+less_sleep_chisq$p.value
+```
+
+#### More talkative
+```{r chi-squared more talkative diagnosis}
+more_talkative <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$more_talkative_Yes)
+             
+
+more_talkative_chisq <- chisq.test(more_talkative)
+
+# P value
+more_talkative_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_talkative,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Racing thoughts
+```{r chi-squared racing_thoughts diagnosis}
+racing_thoughts <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$racing_thoughts_Yes)
+             
+
+racing_thoughts_chisq <- chisq.test(racing_thoughts)
+
+# P value
+racing_thoughts_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(racing_thoughts,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Concentration difficulties
+```{r chi-squared conc_difficulties diagnosis}
+conc_difficulties <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$conc_difficulties_Yes)
+             
+
+conc_difficulties_chisq <- chisq.test(conc_difficulties)
+
+# P value
+conc_difficulties_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(conc_difficulties,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+  
+#### More energy
+```{r chi-squared more_energy diagnosis} 
+more_energy <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$more_energy_Yes)
+             
+
+more_energy_chisq <- chisq.test(more_energy)
+
+# P value
+more_energy_chisq$p.value
+```
+
+#### More active
+```{r chi-squared more_active diagnosis}
+more_active <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$more_active_Yes)
+             
+
+more_active_chisq <- chisq.test(more_active)
+
+# P value
+more_active_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_active,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More social
+```{r chi-squared more_social diagnosis}
+more_social <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$more_social_Yes)
+             
+
+more_social_chisq <- chisq.test(more_social)
+
+# P value
+more_social_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_social,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Higher libido
+```{r chi-squared higher_libido diagnosis}
+higher_libido <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$higher_libido_Yes)
+             
+
+higher_libido_chisq <- chisq.test(higher_libido)
+
+# P value
+higher_libido_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(higher_libido,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More risky behaviour
+```{r chi-squared more_risky_beh diagnosis}
+more_risky_beh <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$more_risky_beh_Yes)
+             
+
+more_risky_beh_chisq <- chisq.test(more_risky_beh)
+
+# P value
+more_risky_beh_chisq$p.value
+
+```
+
+#### Reckless spending
+```{r chi-squared reckless_spending diagnosis}
+reckless_spending <- table(descriptives_dummy$ED_hierarchical,
+              descriptives_dummy$reckless_spending_Yes)
+             
+
+reckless_spending_chisq <- chisq.test(reckless_spending)
+
+# P value
+reckless_spending_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(reckless_spending,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+# Continious variables
+## Generate mode function
+```{r mode function diagnosis}
+mode_func <- function(x, na.rm = FALSE) {
+  if(na.rm){
+    x = x[!is.na(x)]
+  }
+
+  ux <- unique(x)
+  return(ux[which.max(tabulate(match(x, ux)))])
+}
+```
+
+## Table: Comparison of continuous variables
+```{r table compare continuous variables diagnosis}
+# Create table
+numeric_table <- diagnosis_dat %>% 
+  group_by(ED_hierarchical) %>%
+  summarise_at(vars(age,
+                    bmi_signup,
+                    bmi_lowest,
+                    bmi_highest),
+    .funs =
+      list(
+        ~mean(., na.rm = T),
+        ~sd(., na.rm = T),
+        ~IQR(., na.rm=T),
+        mode = ~mode_func(., na.rm = T),
+        ~median(., na.rm = T),
+        ~min(., na.rm = T),
+        ~max(., na.rm = T),
+        missing = ~skimr::n_missing(.),
+        ~skew(., na.rm = T),
+        kurtosis = ~kurtosi(., na.rm = T)
+      )
+  )
+
+numeric_table
+```
+
+## Anovas (or non-parametric equivalent): DIAGNOSIS DATA
+The normality assumption can be checked by using one of the following two approaches:
+
+1. Analyzing the ANOVA model residuals to check the normality for all groups together. This approach is easier and it’s very handy when you have many groups or if there are few data points per group.
+2. Check normality for each group separately. This approach might be used when you have only a few groups and many data points per group.
+#### Age: Testing normality: Histogram and qqplot
+```{r Check normality of age diagnosis}
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/all_age_qqplot_diag.png"))
+
+ggpubr::ggqqplot(diagnosis_dat,
+         "age",
+         facet.by = "ED_hierarchical")
+
+dev.off()
+
+# Histogram of age- ANBP
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/ANBP_age_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of age in ANBP group") +
+  xlab("Age")
+
+dev.off()
+
+# Histogram of age- ANBP
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/BN_age_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of age in BN group") +
+  xlab("Age")
+
+dev.off()
+
+# Histogram of age - BED
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/BED_age_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of age in BED group") +
+  xlab("Age")
+
+dev.off()
+```
+
+```{r age formatting plots for manuscript}
+age_ANBP_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(sample = age)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (age)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+age_ANBP_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Age") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+age_BN_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(sample = age)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (age)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+age_BN_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Age") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+age_BED_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(sample = age)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (age)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+age_BED_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Age") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/formatted_age_qqplot_diag.png"))
+
+ggpubr::ggarrange(age_ANBP_qqplot,
+          age_ANBP_histogram,
+          age_BN_qqplot,
+          age_BN_histogram,
+          age_BED_qqplot,
+          age_BED_histogram,
+          labels = c("Anorexia nervosa binge-eating/purging",
+                     "",
+                     "Bulimia nervosa",
+                     "",
+                     "Binge-eating disorder",
+                     ""),
+          hjust = 0.001,
+          ncol = 2,
+          nrow = 3)
+
+dev.off()
+```
+
+#### Age: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of age diagnosis}
+car::leveneTest(age ~ ED_hierarchical,
+                data = diagnosis_dat) 
+```
+
+##### Age: Both assumptions violated; so performed the non-parametric equivalent of ANOVA: Kruskal-Wallis one-way ANOVA. 
+```{r Kruskal-Wallis rank sum test age diagnosis}
+krus <- kruskal.test(age ~ ED_hierarchical,
+                data = diagnosis_dat) 
+krus$p.value
+```
+
+###### Age: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+Dunn's Kruskal-Wallis Multiple Comparisons.
+```{r Dunns Kruskal-Wallis Multiple Comparisons age diagnosis}
+age_dunnTest <- FSA::dunnTest(age ~ ED_hierarchical,
+                data = diagnosis_dat,
+              method="bh"
+)
+
+print(age_dunnTest, dunn.test.results=TRUE)
+
+age_dunnTest$res
+```
+
+#### BMI signup: Testing normality: Histogram and qqplot
+```{r Check normality of BMI signup diagnosis}
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/all_bmi_signup_qqplot_diag.png"))
+
+ggpubr::ggqqplot(diagnosis_dat,
+         "bmi_signup",
+         facet.by = "ED_hierarchical")
+
+dev.off()
+
+# Histogram of BMI signup- ANBP
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/ANBP_bmi_signup_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of BMI signup in ANBP group") +
+  xlab("BMI signup")
+
+dev.off()
+
+# Histogram of BMI signup- ANBP
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/BN_bmi_signup_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI signup in BN group") +
+  xlab("BMI signup")
+
+dev.off()
+
+# Histogram of BMI signup - BED
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/BED_bmi_signup_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI signup in BED group") +
+  xlab("BMI signup")
+
+dev.off()
+```
+
+```{r bmi_signup formatting plots for manuscript}
+bmi_signup_ANBP_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(sample = bmi_signup)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (signup BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_signup_ANBP_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Signup BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+bmi_signup_BN_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(sample = bmi_signup)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (signup BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_signup_BN_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Signup BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+bmi_signup_BED_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(sample = bmi_signup)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (signup BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_signup_BED_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Signup BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/formatted_bmi_signup_qqplot_diag.png"))
+
+ggpubr::ggarrange(bmi_signup_ANBP_qqplot,
+          bmi_signup_ANBP_histogram,
+          bmi_signup_BN_qqplot,
+          bmi_signup_BN_histogram,
+          bmi_signup_BED_qqplot,
+          bmi_signup_BED_histogram,
+          labels = c("Anorexia nervosa binge-eating/purging",
+                     "",
+                     "Bulimia nervosa",
+                     "",
+                     "Binge-eating disorder",
+                     ""),
+          hjust = 0.001,
+          ncol = 2,
+          nrow = 3)
+
+dev.off()
+```
+
+#### BMI signup: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of BMI signup diagnosis}
+car::leveneTest(bmi_signup ~ ED_hierarchical,
+                data = diagnosis_dat) 
+```
+
+##### BMI signup: Both assumptions violated; so performed the non-parametric equivalent of ANOVA: Kruskal-Wallis one-way ANOVA. 
+```{r Kruskal-Wallis rank sum test BMI signup diagnosis}
+krus <- kruskal.test(bmi_signup ~ ED_hierarchical,
+                data = diagnosis_dat) 
+krus$p.value
+```
+
+###### BMI signup: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+Dunn's Kruskal-Wallis Multiple Comparisons.
+```{r Dunns Kruskal-Wallis Multiple Comparisons BMI signup diagnosis}
+bmi_signup_dunnTest <- FSA::dunnTest(bmi_signup ~ ED_hierarchical,
+                data = diagnosis_dat,
+              method="bh"
+)
+
+print(bmi_signup_dunnTest, dunn.test.results=TRUE)
+
+bmi_signup_dunnTest$res
+```
+
+#### BMI lowest: Testing normality: Histogram and qqplot
+```{r Check normality of BMI lowest diagnosis}
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/all_bmi_lowest_qqplot_diag.png"))
+
+ggpubr::ggqqplot(diagnosis_dat,
+         "bmi_lowest",
+         facet.by = "ED_hierarchical")
+
+dev.off()
+
+# Histogram of BMI lowest- ANBP
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/ANBP_bmi_lowest_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of BMI lowest in ANBP group") +
+  xlab("BMI lowest")
+
+dev.off()
+
+# Histogram of BMI lowest- ANBP
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/BN_bmi_lowest_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI lowest in BN group") +
+  xlab("BMI lowest")
+
+dev.off()
+
+# Histogram of BMI lowest - BED
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/BED_bmi_lowest_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI lowest in BED group") +
+  xlab("BMI lowest")
+
+dev.off()
+```
+
+```{r bmi_lowest formatting plots for manuscript}
+bmi_lowest_ANBP_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(sample = bmi_lowest)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (lowest BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_lowest_ANBP_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Lowest BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+bmi_lowest_BN_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(sample = bmi_lowest)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (lowest BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_lowest_BN_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Lowest BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+bmi_lowest_BED_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(sample = bmi_lowest)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (lowest BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_lowest_BED_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Lowest BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/formatted_bmi_lowest_qqplot_diag.png"))
+
+ggpubr::ggarrange(bmi_lowest_ANBP_qqplot,
+          bmi_lowest_ANBP_histogram,
+          bmi_lowest_BN_qqplot,
+          bmi_lowest_BN_histogram,
+          bmi_lowest_BED_qqplot,
+          bmi_lowest_BED_histogram,
+          labels = c("Anorexia nervosa binge-eating/purging",
+                     "",
+                     "Bulimia nervosa",
+                     "",
+                     "Binge-eating disorder",
+                     ""),
+          hjust = 0.001,
+          ncol = 2,
+          nrow = 3)
+
+dev.off()
+```
+
+#### BMI lowest: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of BMI lowest diagnosis}
+car::leveneTest(bmi_lowest ~ ED_hierarchical,
+                data = diagnosis_dat) 
+```
+
+##### BMI lowest: Both assumptions violated; so performed the non-parametric equivalent of ANOVA: Kruskal-Wallis one-way ANOVA. 
+```{r Kruskal-Wallis rank sum test BMI lowest diagnosis}
+krus <- kruskal.test(bmi_lowest ~ ED_hierarchical,
+                data = diagnosis_dat) 
+krus$p.value
+```
+
+###### BMI lowest: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+Dunn's Kruskal-Wallis Multiple Comparisons.
+```{r Dunns Kruskal-Wallis Multiple Comparisons BMI lowest diagnosis}
+bmi_lowest_dunnTest <- FSA::dunnTest(bmi_lowest ~ ED_hierarchical,
+                data = diagnosis_dat,
+              method="bh"
+)
+
+print(bmi_lowest_dunnTest, dunn.test.results=TRUE)
+
+bmi_lowest_dunnTest$res
+```
+
+#### BMI highest: Testing normality: Histogram and qqplot
+```{r Check normality of BMI highest diagnosis}
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/all_bmi_highest_qqplot_diag.png"))
+
+ggpubr::ggqqplot(diagnosis_dat,
+         "bmi_highest",
+         facet.by = "ED_hierarchical")
+
+dev.off()
+
+# Histogram of BMI highest- ANBP
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/ANBP_bmi_highest_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of BMI highest in ANBP group") +
+  xlab("BMI highest")
+
+dev.off()
+
+# Histogram of BMI highest- ANBP
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/BN_bmi_highest_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI highest in BN group") +
+  xlab("BMI highest")
+
+dev.off()
+
+# Histogram of BMI highest - BED
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/BED_bmi_highest_histogram_diag.png"))
+
+diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI highest in BED group") +
+  xlab("BMI highest")
+
+dev.off()
+```
+
+```{r bmi_highest formatting plots for manuscript}
+bmi_highest_ANBP_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(sample = bmi_highest)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (highest BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_highest_ANBP_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Anorexia binge-eating/purging") %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Highest BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+bmi_highest_BN_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(sample = bmi_highest)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (highest BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_highest_BN_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Bulimia nervosa") %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Highest BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+bmi_highest_BED_qqplot <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(sample = bmi_highest)) +
+  stat_qq() +
+  stat_qq_line() +
+  ggtitle(label = "", subtitle = "A. QQ plot") + # Change label
+  xlab("Theoretical distribution (highest BMI)") + # Change label and unit
+  ylab("Sample") +
+  theme_minimal()
+
+bmi_highest_BED_histogram <- diagnosis_dat %>%
+  filter(ED_hierarchical == "Binge-eating disorder") %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  ggtitle(label = "", subtitle = "B. Histogram") +
+  xlab("Highest BMI") + # Change label and unit
+  ylab("Count") +
+  theme_minimal()
+
+png(file = paste0(filepath_plots, "/diagnosis/descriptives/formatted_bmi_highest_qqplot_diag.png"))
+
+ggpubr::ggarrange(bmi_highest_ANBP_qqplot,
+          bmi_highest_ANBP_histogram,
+          bmi_highest_BN_qqplot,
+          bmi_highest_BN_histogram,
+          bmi_highest_BED_qqplot,
+          bmi_highest_BED_histogram,
+          labels = c("Anorexia nervosa binge-eating/purging",
+                     "",
+                     "Bulimia nervosa",
+                     "",
+                     "Binge-eating disorder",
+                     ""),
+          hjust = 0.001,
+          ncol = 2,
+          nrow = 3)
+
+dev.off()
+```
+
+#### BMI highest: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of BMI highest diagnosis}
+car::leveneTest(bmi_highest ~ ED_hierarchical,
+                data = diagnosis_dat) 
+```
+
+##### BMI highest: Both assumptions violated; so performed the non-parametric equivalent of ANOVA: Kruskal-Wallis one-way ANOVA. 
+```{r Kruskal-Wallis rank sum test BMI highest diagnosis}
+krus <- kruskal.test(bmi_highest ~ ED_hierarchical,
+                data = diagnosis_dat) 
+krus$p.value
+```
+
+###### BMI highest: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+Dunn's Kruskal-Wallis Multiple Comparisons.
+```{r Dunns Kruskal-Wallis Multiple Comparisons BMI highest diagnosis}
+bmi_highest_dunnTest <- FSA::dunnTest(bmi_highest ~ ED_hierarchical,
+                data = diagnosis_dat,
+              method="bh"
+)
+
+print(bmi_highest_dunnTest, dunn.test.results=TRUE)
+
+bmi_highest_dunnTest$res
+```

@@ -1,0 +1,2535 @@
+---
+title: 'Sensitivity analysis: ''Pure'' ED groups'
+author: "Helena Davies"
+date: "19/12/2021"
+output: html_document
+---
+
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = '',
+  prompt = FALSE,
+  cache = FALSE
+  )
+```
+
+Clear global environment prior to initiation
+```{r Clear global environment}
+remove(list = ls())
+```
+
+Read in file with path to data channel
+```{r Read in file with path to data channel on teams}
+source(file = "../credentials/paths.R")
+```
+
+Add the add_numeric function - used to convert character variables into numeric variables
+Add the remove_duplicates function - used to deduplicate and remove NAs from IDs
+Add the sumscores function - used to generate sumscores
+Add the package_check function - used to install and load dependencies
+Add the imp_check function - used to check variables for implausible values
+```{r Read in functions}
+source(file = paste0(filepath_functions, "add_numeric.R"))
+source(file = paste0(filepath_functions, "remove_duplicates.R"))
+source(file = paste0(filepath_functions, "package_check.R"))
+source("./functions.R")
+```
+
+Use package_check to install and load dependencies
+Load tidyverse last
+```{r Install load dependencies}
+packages <- c("summarytools",
+              "sjlabelled",
+              "Amelia",
+              "gtsummary",
+              "janitor",
+              "psych",
+              "corrplot",
+              "rstatix",
+              "networktools",
+              "nnet",
+              "bootnet",
+              "caret",
+              "Matrix",
+              "qgraph",
+              "NetworkComparisonTest",
+              "tidyverse")
+package_check(packages)
+```
+
+Retrieve recent date
+We are using the recent date to save files with paste0() as an extension to not overwrite old versions
+```{r Recent date}
+date <- Sys.Date()
+date
+```
+
+```{r load main environment}
+# Load environment from original analysis to get BED network (already 'pure'). Load now so necessary variables are saved over.
+load(paste0(filepath_own, "NetAnalEDMan/scripts/MainAnalysis_environment.RData"))
+```
+
+# Read in merged data with variables created
+Read in data 
+```{r Read in data}
+# Diagnosis dat
+diagnosis_dat <- readRDS(file = "../data/diagnosis_dat_analysis2022-01-13.rds")
+dim(diagnosis_dat)
+colnames(diagnosis_dat)
+
+# Select and rename variables
+diagnosis_dat <- diagnosis_dat %>%
+  select(
+    ID,
+    age = age_dx_level,
+    sex = sex_final,
+    sex_numeric = sex_final_numeric,
+    ethnicity,
+    bmi_signup = bmi_signup_dx_level,
+    bmi_lowest =bmi_lowest_dx_level,
+    bmi_highest = bmi_highest_dx_level,
+    pure_binge_eating_disorder,
+    pure_bulimia_nervosa,
+    pure_anorexia_nervosa_binge_purge,
+    more_hyperactivity = more_hyperactivity_dx_level,
+   more_irritability= more_irritability_dx_level,
+   more_self_confidence = more_self_confidence_dx_level,
+   less_sleep = less_sleep_dx_level,                    
+   more_talkative = more_talkative_dx_level,
+   racing_thoughts = racing_thoughts_dx_level,
+   conc_difficulties = conc_difficulties_dx_level,     
+   more_energy = more_energy_dx_level,
+   more_active = more_active_dx_level,
+   more_social = more_social_dx_level,             
+   higher_libido = higher_libido_dx_level,
+   more_risky_beh = more_risky_beh_dx_level,
+   reckless_spending = reckless_spending_dx_level,
+   
+   more_hyperactivity_numeric = more_hyperactivity_numeric_dx_level,
+   more_irritability_numeric= more_irritability_numeric_dx_level,
+   more_self_confidence_numeric = more_self_confidence_numeric_dx_level,
+   less_sleep_numeric = less_sleep_numeric_dx_level,                    
+   more_talkative_numeric = more_talkative_numeric_dx_level,
+   racing_thoughts_numeric = racing_thoughts_numeric_dx_level,
+   conc_difficulties_numeric = conc_difficulties_numeric_dx_level,     
+   more_energy_numeric = more_energy_numeric_dx_level,
+   more_active_numeric = more_active_numeric_dx_level,
+   more_social_numeric = more_social_numeric_dx_level,             
+   higher_libido_numeric = higher_libido_numeric_dx_level,
+   more_risky_beh_numeric = more_risky_beh_numeric_dx_level,
+   reckless_spending_numeric = reckless_spending_numeric_dx_level
+   
+    ) 
+```
+
+# NETWORKS 
+## Preprocessing check assessing collinearity 
+### Diagnosis data
+
+Main nodes:
+1...you felt so good or so hyper that other people thought you were not your normal self or you were so hyper that you got into trouble? (hyp)
+2...you got much less sleep than usual and found you didn't really miss it? (sle)
+3...you were so easily distracted by things around you that you had trouble concentrating or staying on track? (con)
+4...you were much more social or outgoing than usual, for example, you telephoned friends in the middle of the night? (soc)
+5..spending money got you or your family into trouble? (mon)
+6...you were so irritable that you shouted at people or start fights or arguments? (irr)
+7...you were much more talkative or spoke much faster than usual? (tal)
+8...you had much more energy than usual? (ene)
+9...you were much more interested in sex than usual? (sex)
+10...you felt much more self-confident than usual? (scf)
+11...thoughts raced through your head or you couldn't slow your mind down? (rac)
+12..you were much more active or did many more things than usual? (act)
+13...you did things that were unusual for you or that other people might have thought were excessive, foolish, or risky? (ris)
+
+(From Lissy's paper: "Pre-processing checks assessing collinearity were conducted using the ‘goldbricker’ function from the R package ‘networktools’, which compares correlations in order to identify nodes which are likely to measure the same underlying construct").
+```{r goldbrick function assessing collinearity diagnosis data diagnosis data}
+mania_nodes_ANBP_pure <- diagnosis_dat %>%
+   filter(pure_anorexia_nervosa_binge_purge == 1) %>%
+  select(
+   more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric,
+   sex_numeric,
+   age
+  )
+
+mania_nodes_BN_pure <- diagnosis_dat %>%
+   filter(pure_bulimia_nervosa == 1) %>%
+  select(
+   more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric,
+   sex_numeric,
+   age
+  )
+
+mania_nodes_mixed_presentation <- diagnosis_dat %>%
+   filter(is.na(pure_bulimia_nervosa) &
+           is.na(pure_anorexia_nervosa_binge_purge) &
+             is.na(pure_binge_eating_disorder)) %>%
+  select(
+   more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric,
+   sex_numeric,
+   age
+  )
+```
+
+### Abbreviations of symptoms 
+```{r abbreviations of symptoms }
+shortnames <- c(
+  "hyp",
+                "irr",
+                "scf",
+                "sle",
+                "talk",
+                "rac",
+                "con",
+                "ene",
+                "act",
+                "soc",
+                "lib",
+                "ris",
+                "mon",
+                "sex",
+                "age")
+```
+
+### Long names 
+```{r nodes long names }
+longnames <- c(
+  "Hyperactivity",
+  "More irritability",
+  "More self-confidence",
+  "Less sleep",
+  "More talkative",
+  "Racing thoughts",
+  "Concentration difficulties",
+  "More energy",
+  "More active",
+  "More social",
+  "Higher libido",
+  "Unusual and/or risky behaviour",
+  "Reckless spending",
+  "Sex",
+  "Age"
+  ) 
+```
+
+### Generate initial network for use in generating predictability estimates ANBP
+```{r initial network for use in predictability ANBP}
+# Type of variable. C = categorical, g = gaussian
+type = c(rep("c", 14),
+         "g")
+
+# Number of levels. For the first 14 variables, there are 2 levels (0 and 1). The last variable (age) is continuous so level is set to 1.
+level = c(rep(2, 14), 
+          1) 
+
+ANBP_network <- mgm::mgm(mania_nodes_ANBP_pure,
+                  type = type,
+                  level = level,
+                  lambdaSel = "EBIC",
+                  lambdaGam = 0.25,
+                  binarySign = TRUE, 
+                  scale = TRUE)
+```
+
+### Adding predictability of nodes ANBP
+From this paper: https://link.springer.com/article/10.3758/s13428-017-0910-x
+```{r generating predictability of nodes ANBP}
+p_obj <- predict(object = ANBP_network,
+                 data = mania_nodes_ANBP_pure,
+                 errorCat = c("CC", "nCC", "CCmarg"),
+                 errorCon = c("R2"))
+
+p_obj$error
+
+# To display both the accuracy of the intercept model and the normalized accuracy (contribution by other variables), we require a list for the ring-segments and a list for the corresponding colors:
+
+error_list_ANBP <- list() # List for ring segments
+beyondmarg <- vector()
+
+for(i in 1:14) beyondmarg[[i]] <- p_obj$errors[i, 3]-p_obj$errors[i, 5]
+for(i in 1:14) error_list_ANBP[[i]] <- c(p_obj$errors[i, 5], beyondmarg[[i]])
+error_list_ANBP[[15]] <- p_obj$errors[15,2]
+
+color_list <- list() # List for colours
+for(i in 1:14) color_list[[i]] <- c("#ffa500", "#ff4300")
+#color_list[[15]] <- p_obj$errors[15,2]
+color_list[[15]] <- "#90B4D4"
+```
+
+### Walktrap algorithm: 
+https://www.nature.com/articles/srep05918
+https://pure.uva.nl/ws/files/21235882/Network_Analysis_on_Attitudes.png
+Walktrap, developed by Pascal Pons, is an algorithm in graph theory, used to identify communities in large networks via random walks. These random walks are then used to compute distances between nodes. Nodes are then assigned into groups with small intra and larger inter-community distances via bottom-up hierarchical clustering. It should be noted, of course, that this algorithm considers only one community per node, which in some cases can be an incorrect hypothesis.
+```{r walktrap algorithm ANBP}
+# Create an igraph object containing the information on the  network and take the absolute values of the edge weights because the walktrap algorithm can only deal with positive edge values
+
+ANBP_network <- estimateNetwork(mania_nodes_ANBP_pure,
+                               default = "mgm",
+                               type = type,
+                               level = level,
+                               tuning = 0.25,
+                               binarySign = TRUE)
+
+
+ANBPigraph <- igraph::graph_from_adjacency_matrix(abs(ANBP_network$graph), 
+                                      weighted =TRUE,
+                                      add.colnames = FALSE)
+
+
+# Run walktrap algorithm on the network 
+ANBPCom <- igraph::cluster_walktrap(ANBPigraph)
+
+# Extract the found communities using the following command:
+ANBPcommunities <- igraph::communities(ANBPCom)
+
+# Manually move age and sex into their own community (they are covariates. We estimated the groups first because we need the associations that have been adjusted for age and sex, but do not want them to form part of a group because they are not symptoms)
+ANBPcommunities$`4` <- c(14,
+                        15)
+
+ANBPcommunities$`1`  <- c(10,
+                          11,
+                          12,
+                          13
+                        )
+
+
+# Rename clusters
+ANBPcommunities$`Cluster 1` <- ANBPcommunities$`1` 
+ANBPcommunities$`1`  <- NULL
+
+ANBPcommunities$`Cluster 2` <- ANBPcommunities$`2` 
+ANBPcommunities$`2`  <- NULL
+
+ANBPcommunities$`Cluster 3` <-ANBPcommunities$`3` 
+ANBPcommunities$`3`  <- NULL
+
+ANBPcommunities$`Covariates` <-ANBPcommunities$`4` 
+ANBPcommunities$`4`  <- NULL
+```
+
+### Plot ANBP network with walktrap algorithm AND predictability of nodes 
+Using mgm package
+```{r plotting ANBP network with walktrap and predictability}
+# Type of variable. C = categorical, g = gaussian
+type = c(rep("c", 14),
+         "g")
+
+# Number of levels. For the first 14 variables, there are 2 levels (0 and 1). The last variable (age) is continuous so level is set to 1.
+level = c(rep(2, 14), 
+          1) 
+
+ANBP_network <- mgm::mgm(mania_nodes_ANBP_pure,
+                  type = type,
+                  level = level,
+                  lambdaSel = "EBIC",
+                  lambdaGam = 0.25,
+                  binarySign = TRUE, 
+                  scale = TRUE)
+
+ANBP_network_plot <- qgraph::qgraph(ANBP_network$pairwise$wadj, # weighted adjacency matrix as input
+       #layout = layout, 
+       pie = error_list_ANBP, # provide errors as input
+       pieColor = color_list,
+       edge.color = "blue3",
+       cut = 0, 
+       labels = shortnames,
+       nodeNames = longnames,
+       groups =  ANBPcommunities,
+       palette = "colorblind",
+       label.scale = T,
+       title = "Network of mania symptoms in ANBP sample,
+                   n = 450"
+      )
+```
+
+### Plot using the bootnet package for use in later analyses (e.g., centrality estimates, etc)
+```{r plotting network using estimateNetwork ANBP}
+ANBP_network_bootnet <- estimateNetwork(mania_nodes_ANBP_pure,
+                               default = "mgm",
+                               type = type,
+                               level = level,
+                               tuning = 0.25,
+                               binarySign = TRUE,
+                               criterion = "EBIC",
+                        labels = shortnames)
+
+
+
+ANBP_network_bootnet_plot <- plot(ANBP_network_bootnet,
+                           layout = "spring",
+                           labels = shortnames, 
+                           nodeNames = longnames,
+                           legend = TRUE,
+                           title = paste("Symptom network of mania items in ANBP sample,
+                   n =", ANBP_network_bootnet$nPerson))
+```
+
+### ANBP network information
+```{r ANBP network information ANBP}
+ANBP_network_bootnet$graph # the weights (adjacency) matrix of the network (symmetrical in undirected networks)
+ANBP_network_bootnet$intercepts # the thresholds (represent the intercept for each symptom in the regularized logistic regression analyses used to estimate the networks)
+ANBP_network_bootnet$results # weights matrix and intercepts
+ANBP_network_bootnet$labels # variable labels
+ANBP_network_bootnet$nNodes # number of nodes in network
+ANBP_network_bootnet$nPerson # number of persons in network
+```
+
+### ANBP centrality estimates
+```{r centrality estimates ANBP}
+# Raw centrality measures (not standardised)
+qgraph::centrality(ANBP_network_bootnet)
+
+# Standardised centrality estimates [node strength]
+plot(qgraph::centrality(ANBP_network_bootnet)$InDegree,
+     type = "b") 
+
+# Standardised centrality estimated for four centrality indices
+qgraph::centralityTable(ANBP_network_bootnet)
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_plot_ANBP.png"))
+
+qgraph::centralityPlot(ANBP_network_bootnet, # NB: For these plots, age and sex have to be included. Can't remove them.
+               include ="all",
+               labels = longnames) 
+
+dev.off()
+```
+
+### ANBP Edge weight accuracy
+Use the bootnet() function to estimate edge weight accuracy and centrality stability and plot them
+See: Estimating psychological networks and their accuracy: A tutorial paper
+Bootstrapping = picking people with replacement, i.e. each sample will have a different composition of people (e.g. choosing a random 70% of the sample each time)
+```{r edge weight accuracy ANBP network}
+edge_accuracy_ANBP_network <- bootnet(ANBP_network_bootnet,
+                                     nBoots = 1000, 
+                                     nCores = 4,
+                                     statistics = c("edge", 
+                                                    "strength",
+                                                    "betweenness",
+                                                    "closeness",
+                                                    "expectedInfluence"),
+                                     labels = shortnames
+                                     ) 
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_edge_accuracy_plot_ANBP.png"))
+
+plot(edge_accuracy_ANBP_network, 
+                                      #plot = "interval",
+                                      # split0 = TRUE,
+                                      order = "sample",
+                                       labels = TRUE)
+
+dev.off()
+
+edge_accuracy_ANBP_network_plot <- plot(edge_accuracy_ANBP_network, 
+                                      #plot = "interval",
+                                      # split0 = TRUE,
+                                      order = "sample",
+                                       labels = TRUE)
+
+edge_accuracy_ANBP_network_plot
+
+# This function makes a ’multiverse’ plot of bootstrap results. Every row indicates an edge and every column a bootstrap; colors are in line of the edge strength as drawn with plot.bootnetResult.
+#multiverse(edge_accuracy_ANBP_network_plot,
+#           labels = T) 
+```
+
+### ANBP centrality accuracy
+```{r centrality accuracy ANBP network}
+centrality_stability_ANBP_network <- bootnet(ANBP_network_bootnet,
+                                nBoots = 1000, 
+                                nCores = 1,
+                                type = "case", #case-dropping bootstrap
+                                statistics = c("closeness",
+                                               "strength",
+                                               "betweenness",
+                                               "expectedInfluence")) 
+
+centrality_stability_ANBP_network
+
+# Table of all statistics from original sample 
+centrality_stability_ANBP_network$sampleTable 
+
+# Results of bootstrap
+centrality_stability_ANBP_network$boots
+
+# Table of all statistics from bootstraps
+centrality_stability_ANBP_network$bootTable
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_stability_plot_ANBP.png"))
+
+# Plot centrality stability
+plot(centrality_stability_ANBP_network,
+                                              statistics = c("closeness",
+                                                             "strength",
+                                                             "betweenness",
+                                                             "expectedInfluence"))
+
+dev.off()
+
+centrality_stability_ANBP_network_plot <- plot(centrality_stability_ANBP_network,
+                                              statistics = c("closeness",
+                                                             "strength",
+                                                             "betweenness",
+                                                             "expectedInfluence"))
+
+centrality_stability_ANBP_network_plot
+
+
+# CS-coefficient (to quantify the centrality stability)
+corStability(centrality_stability_ANBP_network,
+              cor = 0.7,
+              statistics = "all")
+```
+
+### Test significance of differences (between edge weights and node centralities) to test for differences within a single network 
+Significance: Specific edge weights
+```{r test significance of differences of specific edge weight ANBP network}
+# Plot significant differences (alpha = 0.05) of edge weights:
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_edges_plot_ANBP.png"))
+
+plot(edge_accuracy_ANBP_network,
+     "edge",
+     plot = "difference",
+     onlyNonZero = TRUE,
+     order = "sample",
+     labels = TRUE
+     )
+
+dev.off()
+```
+
+Significance: Node centralities
+```{r test significance of differences of node centralities ANBP network}
+# Plot significant differences (alpha = 0.05) of node centrality eg. strength for all nodes:
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_node_centralities_plot_ANBP.png"))
+
+plot(edge_accuracy_ANBP_network,
+     "expectedInfluence",
+     plot = "difference",
+     order = "sample"
+     ) # Note: use edge accuracy estimates for this as centrality is a measure of connecting edges
+
+dev.off()
+# Test for difference in strength between specific nodes - perhaps more useful if you have apriori reason to explore specific differents in nodes
+# Eg. difference in centrality between ene and expectedInfluence for strength 
+# differenceTest(edge_accuracy_ED_network,  "ene", "rac", "expectedInfluence")
+```
+
+# BN
+### Generate initial network for use in generating predictability estimates BN
+```{r initial network for use in predictability BN}
+# Type of variable. C = categorical, g = gaussian
+type = c(rep("c", 14),
+         "g")
+
+# Number of levels. For the first 14 variables, there are 2 levels (0 and 1). The last variable (age) is continuous so level is set to 1.
+level = c(rep(2, 14), 
+          1) 
+
+BN_network <- mgm::mgm(mania_nodes_BN_pure,
+                  type = type,
+                  level = level,
+                  lambdaSel = "EBIC",
+                  lambdaGam = 0.25,
+                  binarySign = TRUE, 
+                  scale = TRUE)
+```
+
+### Adding predictability of nodes BN
+From this paper: https://link.springer.com/article/10.3758/s13428-017-0910-x
+```{r generating predictability of nodes BN}
+p_obj <- predict(object = BN_network,
+                 data = mania_nodes_BN_pure,
+                 errorCat = c("CC", "nCC", "CCmarg"),
+                 errorCon = c("R2"))
+
+p_obj$error
+
+# To display both the accuracy of the intercept model and the normalized accuracy (contribution by other variables), we require a list for the ring-segments and a list for the corresponding colors:
+
+error_list_BN <- list() # List for ring segments
+beyondmarg <- vector()
+
+for(i in 1:14) beyondmarg[[i]] <- p_obj$errors[i, 3]-p_obj$errors[i, 5]
+for(i in 1:14) error_list_BN[[i]] <- c(p_obj$errors[i, 5], beyondmarg[[i]])
+error_list_BN[[15]] <- p_obj$errors[15,2]
+
+color_list <- list() # List for colours
+for(i in 1:14) color_list[[i]] <- c("#ffa500", "#ff4300")
+#color_list[[15]] <- p_obj$errors[15,2]
+color_list[[15]] <- "#90B4D4"
+```
+
+### Walktrap algorithm: 
+https://www.nature.com/articles/srep05918
+https://pure.uva.nl/ws/files/21235882/Network_Analysis_on_Attitudes.png
+Walktrap, developed by Pascal Pons, is an algorithm in graph theory, used to identify communities in large networks via random walks. These random walks are then used to compute distances between nodes. Nodes are then assigned into groups with small intra and larger inter-community distances via bottom-up hierarchical clustering. It should be noted, of course, that this algorithm considers only one community per node, which in some cases can be an incorrect hypothesis.
+```{r walktrap algorithm BN}
+# Create an igraph object containing the information on the  network and take the absolute values of the edge weights because the walktrap algorithm can only deal with positive edge values
+BN_network <- estimateNetwork(mania_nodes_BN_pure,
+                               default = "mgm",
+                               type = type,
+                               level = level,
+                               tuning = 0.25,
+                               binarySign = TRUE)
+
+
+BNigraph <- igraph::graph_from_adjacency_matrix(abs(BN_network$graph), 
+                                      weighted =TRUE,
+                                      add.colnames = FALSE)
+
+
+# Run walktrap algorithm on the network 
+BNCom <- igraph::cluster_walktrap(BNigraph)
+
+# Extract the found communities using the following command:
+BNcommunities <- igraph::communities(BNCom)
+
+# Manually move age and sex into their own community (they are covariates. We estimated the groups first because we need the associations that have been adjusted for age and sex, but do not want them to form part of a group because they are not symptoms)
+BNcommunities$`2`  <- c(12,
+                        13)
+
+BNcommunities$`5`  <- c(14,
+                        15)
+
+# Rename clusters
+BNcommunities$`Cluster 1` <- BNcommunities$`1` 
+BNcommunities$`1`  <- NULL
+
+BNcommunities$`Cluster 2` <- BNcommunities$`2` 
+BNcommunities$`2`  <- NULL
+
+BNcommunities$`Cluster 3` <-BNcommunities$`3` 
+BNcommunities$`3`  <- NULL
+
+BNcommunities$`Cluster 4` <-BNcommunities$`4` 
+BNcommunities$`4`  <- NULL
+
+BNcommunities$`Covariates` <-BNcommunities$`5` 
+BNcommunities$`5`  <- NULL
+```
+
+### Plot BN network with walktrap algorithm AND predictability of nodes 
+Using mgm package
+```{r plotting BN network with walktrap and predictability}
+# Type of variable. C = categorical, g = gaussian
+type = c(rep("c", 14),
+         "g")
+
+# Number of levels. For the first 14 variables, there are 2 levels (0 and 1). The last variable (age) is continuous so level is set to 1.
+level = c(rep(2, 14), 
+          1) 
+
+BN_network <- mgm::mgm(mania_nodes_BN_pure,
+                  type = type,
+                  level = level,
+                  lambdaSel = "EBIC",
+                  lambdaGam = 0.25,
+                  binarySign = TRUE, 
+                  scale = TRUE)
+
+BN_network_plot <- qgraph::qgraph(BN_network$pairwise$wadj, # weighted adjacency matrix as input
+       #layout = layout, 
+       pie = error_list_BN, # provide errors as input
+       pieColor = color_list,
+       edge.color = "blue3",
+       cut = 0, 
+       labels = shortnames,
+       nodeNames = longnames,
+       groups =  BNcommunities,
+       palette = "colorblind",
+       label.scale = T,
+       title = "Network of mania symptoms in BN sample,
+                   n = 5385"
+      )
+```
+
+### Plot using the bootnet package for use in later analyses (e.g., centrality estimates, etc)
+```{r plotting network using estimateNetwork BN}
+BN_network_bootnet <- estimateNetwork(mania_nodes_BN_pure,
+                               default = "mgm",
+                               type = type,
+                               level = level,
+                               tuning = 0.25,
+                               binarySign = TRUE,
+                               criterion = "EBIC",
+                               labels = shortnames)
+
+
+
+BN_network_bootnet_plot <- plot(BN_network_bootnet,
+                           layout = "spring",
+                           labels = shortnames, 
+                           nodeNames = longnames,
+                           legend = TRUE,
+                           title = paste("Symptom network of mania items in BN sample,
+                   n =", BN_network_bootnet$nPerson))
+```
+
+### BN network information
+```{r BN network information BN}
+BN_network_bootnet$graph # the weights (adjacency) matrix of the network (symmetrical in undirected networks)
+BN_network_bootnet$intercepts # the thresholds (represent the intercept for each symptom in the regularized logistic regression analyses used to estimate the networks)
+BN_network_bootnet$results # weights matrix and intercepts
+BN_network_bootnet$labels # variable labels
+BN_network_bootnet$nNodes # number of nodes in network
+BN_network_bootnet$nPerson # number of persons in network
+```
+
+### BN centrality estimates
+```{r centrality estimates BN}
+# Raw centrality measures (not standardised)
+qgraph::centrality(BN_network_bootnet)
+
+# Standardised centrality estimates [node strength]
+plot(qgraph::centrality(BN_network_bootnet)$InDegree,
+     type = "b") 
+
+# Standardised centrality estimated for four centrality indices
+qgraph::centralityTable(BN_network_bootnet)
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_plot_BN.png"))
+
+qgraph::centralityPlot(BN_network_bootnet,
+               include ="all",
+               labels = longnames) 
+
+dev.off()
+```
+
+### BN Edge weight accuracy
+Use the bootnet() function to estimate edge weight accuracy and centrality stability and plot them
+See: Estimating psychological networks and their accuracy: A tutorial paper
+Bootstrapping = picking people with replacement, i.e. each sample will have a different composition of people (e.g. choosing a random 70% of the sample each time)
+```{r edge weight accuracy BN network}
+edge_accuracy_BN_network <- bootnet(BN_network_bootnet,
+                                     nBoots = 1000, 
+                                     nCores = 4,
+                                     statistics = c("edge", 
+                                                    "strength",
+                                                    "betweenness",
+                                                    "closeness",
+                                                    "expectedInfluence"),
+                                     labels = shortnames
+                                     ) 
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_edge_accuracy_plot_BN.png"))
+
+plot(edge_accuracy_BN_network,
+                                      #plot = "interval",
+                                      # split0 = TRUE,
+                                      order = "sample",
+                                       labels = TRUE)
+
+dev.off()
+
+edge_accuracy_BN_network_plot <- plot(edge_accuracy_BN_network,
+                                      #plot = "interval",
+                                      # split0 = TRUE,
+                                      order = "sample",
+                                       labels = TRUE)
+
+edge_accuracy_BN_network_plot
+
+# This function makes a ’multiverse’ plot of bootstrap results. Every row indicates an edge and every column a bootstrap; colors are in line of the edge strength as drawn with plot.bootnetResult.
+#multiverse(edge_accuracy_BN_network_plot,
+#           labels = T) 
+```
+
+### BN centrality accuracy
+```{r centrality accuracy BN network}
+centrality_stability_BN_network <- bootnet(BN_network_bootnet,
+                                nBoots = 1000, 
+                                nCores = 1,
+                                type = "case", #case-dropping bootstrap
+                                statistics = c("closeness",
+                                               "strength",
+                                               "betweenness",
+                                               "expectedInfluence")) 
+
+centrality_stability_BN_network
+
+# Table of all statistics from original sample 
+centrality_stability_BN_network$sampleTable 
+
+# Results of bootstrap
+centrality_stability_BN_network$boots
+
+# Table of all statistics from bootstraps
+centrality_stability_BN_network$bootTable
+
+# Plot centrality stability
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_stability_plot_BN.png"))
+
+plot(centrality_stability_BN_network,
+                                              statistics = c("closeness",
+                                                             "strength",
+                                                             "betweenness",
+                                                             "expectedInfluence"))
+
+dev.off()
+
+centrality_stability_BN_network_plot <- plot(centrality_stability_BN_network,
+                                              statistics = c("closeness",
+                                                             "strength",
+                                                             "betweenness",
+                                                             "expectedInfluence"))
+
+centrality_stability_BN_network_plot
+
+
+# CS-coefficient (to quantify the centrality stability)
+corStability(centrality_stability_BN_network,
+              cor = 0.7,
+              statistics = "all")
+```
+
+### Test significance of differences (between edge weights and node centralities) to test for differences within a single network 
+Significance: Specific edge weights
+```{r test significance of differences of specific edge weight BN network}
+# Plot significant differences (alpha = 0.05) of edge weights:
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_edges_plot_BN.png"))
+
+plot(edge_accuracy_BN_network,
+     "edge",
+     plot = "difference",
+     onlyNonZero = TRUE,
+     order = "sample",
+     labels = TRUE
+     )
+
+dev.off()
+```
+
+Significance: Node centralities
+```{r test significance of differences of node centralities BN network}
+# Plot significant differences (alpha = 0.05) of node centrality eg. strength for all nodes:
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_node_centralities_plot_BN.png"))
+
+plot(edge_accuracy_BN_network,
+     "expectedInfluence",
+     plot = "difference",
+     order = "sample"
+     ) # Note: use edge accuracy estimates for this as centrality is a measure of connecting edges
+
+dev.off()
+```
+
+# MIXED PRESENTATION 
+### Generate initial network for use in generating predictability estimates mixed_presentation
+```{r initial network for use in predictability mixed_presentation}
+# Type of variable. C = categorical, g = gaussian
+type = c(rep("c", 14),
+         "g")
+
+# Number of levels. For the first 14 variables, there are 2 levels (0 and 1). The last variable (age) is continuous so level is set to 1.
+level = c(rep(2, 14), 
+          1) 
+
+mixed_presentation_network <- mgm::mgm(mania_nodes_mixed_presentation,
+                  type = type,
+                  level = level,
+                  lambdaSel = "EBIC",
+                  lambdaGam = 0.25,
+                  binarySign = TRUE, 
+                  scale = TRUE)
+```
+
+### Adding predictability of nodes mixed_presentation
+From this paper: https://link.springer.com/article/10.3758/s13428-017-0910-x
+```{r generating predictability of nodes mixed_presentation}
+p_obj <- predict(object = mixed_presentation_network,
+                 data = mania_nodes_mixed_presentation,
+                 errorCat = c("CC", "nCC", "CCmarg"),
+                 errorCon = c("R2"))
+
+p_obj$error
+
+# To display both the accuracy of the intercept model and the normalized accuracy (contribution by other variables), we require a list for the ring-segments and a list for the corresponding colors:
+
+error_list_mixed_presentation <- list() # List for ring segments
+beyondmarg <- vector()
+
+for(i in 1:14) beyondmarg[[i]] <- p_obj$errors[i, 3]-p_obj$errors[i, 5]
+for(i in 1:14) error_list_mixed_presentation[[i]] <- c(p_obj$errors[i, 5], beyondmarg[[i]])
+error_list_mixed_presentation[[15]] <- p_obj$errors[15,2]
+
+color_list <- list() # List for colours
+for(i in 1:14) color_list[[i]] <- c("#ffa500", "#ff4300")
+#color_list[[15]] <- p_obj$errors[15,2]
+color_list[[15]] <- "#90B4D4"
+```
+
+### Walktrap algorithm: 
+https://www.nature.com/articles/srep05918
+https://pure.uva.nl/ws/files/21235882/Network_Analysis_on_Attitudes.png
+Walktrap, developed by Pascal Pons, is an algorithm in graph theory, used to identify communities in large networks via random walks. These random walks are then used to compute distances between nodes. Nodes are then assigned into groups with small intra and larger inter-community distances via bottom-up hierarchical clustering. It should be noted, of course, that this algorithm considers only one community per node, which in some cases can be an incorrect hypothesis.
+```{r walktrap algorithm mixed_presentation}
+# Create an igraph object containing the information on the  network and take the absolute values of the edge weights because the walktrap algorithm can only deal with positive edge values
+mixed_presentation_network <- estimateNetwork(mania_nodes_mixed_presentation,
+                               default = "mgm",
+                               type = type,
+                               level = level,
+                               tuning = 0.25,
+                               binarySign = TRUE)
+
+
+mixed_presentationigraph <- igraph::graph_from_adjacency_matrix(abs(mixed_presentation_network$graph), 
+                                      weighted =TRUE,
+                                      add.colnames = FALSE)
+
+
+# Run walktrap algorithm on the network 
+mixed_presentationCom <- igraph::cluster_walktrap(mixed_presentationigraph)
+
+# Extract the found communities using the following command:
+mixed_presentationcommunities <- igraph::communities(mixed_presentationCom)
+
+# Manually move age and sex into their own community (they are covariates. We estimated the groups first because we need the associations that have been adjusted for age and sex, but do not want them to form part of a group because they are not symptoms)
+mixed_presentationcommunities$`1`  <- c(2,
+                                        6,
+                                        7,
+                                        13
+                                        )
+
+
+mixed_presentationcommunities$`2` <- c(1,
+                                       3,
+                                       4,
+                                       5,
+                                       8,
+                                       9,
+                                       10,
+                                       11,
+                                       12
+                                       )
+
+mixed_presentationcommunities$`3`  <- c(14,
+                                        15
+                        )
+
+
+# Rename clusters
+mixed_presentationcommunities$`Cluster 1` <- mixed_presentationcommunities$`1` 
+mixed_presentationcommunities$`1`  <- NULL
+
+mixed_presentationcommunities$`Cluster 2` <- mixed_presentationcommunities$`2` 
+mixed_presentationcommunities$`2`  <- NULL
+
+mixed_presentationcommunities$`Covariates` <-mixed_presentationcommunities$`3` 
+mixed_presentationcommunities$`3`  <- NULL
+```
+
+### Plot mixed_presentation network with walktrap algorithm AND predictability of nodes 
+Using mgm package
+```{r plotting mixed_presentation network with walktrap and predictability}
+# Type of variable. C = categorical, g = gaussian
+type = c(rep("c", 14),
+         "g")
+
+# Number of levels. For the first 14 variables, there are 2 levels (0 and 1). The last variable (age) is continuous so level is set to 1.
+level = c(rep(2, 14), 
+          1) 
+
+mixed_presentation_network <- mgm::mgm(mania_nodes_mixed_presentation,
+                  type = type,
+                  level = level,
+                  lambdaSel = "EBIC",
+                  lambdaGam = 0.25,
+                  binarySign = TRUE, 
+                  scale = TRUE)
+
+mixed_presentation_network_plot <- qgraph::qgraph(mixed_presentation_network$pairwise$wadj, # weighted adjacency matrix as input
+       #layout = layout, 
+       pie = error_list_mixed_presentation, # provide errors as input
+       pieColor = color_list,
+       edge.color = "blue3",
+       cut = 0, 
+       labels = shortnames,
+       nodeNames = longnames,
+       groups =  mixed_presentationcommunities,
+       palette = "colorblind",
+       label.scale = T,
+       title = "Network of mania symptoms in mixed_presentation sample,
+                   n = 2,746"
+      )
+```
+
+### Plot using the bootnet package for use in later analyses (e.g., centrality estimates, etc)
+```{r plotting network using estimateNetwork mixed_presentation}
+mixed_presentation_network_bootnet <- estimateNetwork(mania_nodes_mixed_presentation,
+                               default = "mgm",
+                               type = type,
+                               level = level,
+                               tuning = 0.25,
+                               binarySign = TRUE,
+                               criterion = "EBIC",
+                        labels = shortnames)
+
+
+
+mixed_presentation_network_bootnet_plot <- plot(mixed_presentation_network_bootnet,
+                           layout = "spring",
+                           labels = shortnames, 
+                           nodeNames = longnames,
+                           legend = TRUE,
+                           title = paste("Symptom network of mania items in mixed_presentation sample,
+                   n =", mixed_presentation_network_bootnet$nPerson))
+```
+
+### mixed_presentation network information
+```{r mixed_presentation network information mixed_presentation}
+mixed_presentation_network_bootnet$graph # the weights (adjacency) matrix of the network (symmetrical in undirected networks)
+mixed_presentation_network_bootnet$intercepts # the thresholds (represent the intercept for each symptom in the regularized logistic regression analyses used to estimate the networks)
+mixed_presentation_network_bootnet$results # weights matrix and intercepts
+mixed_presentation_network_bootnet$labels # variable labels
+mixed_presentation_network_bootnet$nNodes # number of nodes in network
+mixed_presentation_network_bootnet$nPerson # number of persons in network
+```
+
+### mixed_presentation centrality estimates
+```{r centrality estimates mixed_presentation}
+# Raw centrality measures (not standardised)
+qgraph::centrality(mixed_presentation_network_bootnet)
+
+# Standardised centrality estimates [node strength]
+plot(qgraph::centrality(mixed_presentation_network_bootnet)$InDegree,
+     type = "b") 
+
+# Standardised centrality estimated for four centrality indices
+qgraph::centralityTable(BED_network_bootnet,
+                        labels = longnames)
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_plot_mixed_presentation.png"))
+
+qgraph::centralityPlot(mixed_presentation_network_bootnet, # NB: For these plots, age and sex have to be included. Can't remove them.
+               include ="all",
+               labels = longnames) 
+
+dev.off()
+```
+
+### mixed_presentation Edge weight accuracy
+Use the bootnet() function to estimate edge weight accuracy and centrality stability and plot them
+See: Estimating psychological networks and their accuracy: A tutorial paper
+Bootstrapping = picking people with replacement, i.e. each sample will have a different composition of people (e.g. choosing a random 70% of the sample each time)
+```{r edge weight accuracy mixed_presentation network}
+edge_accuracy_mixed_presentation_network <- bootnet(mixed_presentation_network_bootnet,
+                                     nBoots = 1000,
+                                     nCores = 4,
+                                     statistics = c("edge", 
+                                                    "strength",
+                                                    "betweenness",
+                                                    "closeness",
+                                                    "expectedInfluence"),
+                                     labels = shortnames
+                                     ) 
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_edge_accuracy_plot_mixed_presentation.png"))
+
+plot(edge_accuracy_mixed_presentation_network, 
+                                      #plot = "interval",
+                                      # split0 = TRUE,
+                                      order = "sample",
+                                       labels = TRUE)
+
+dev.off()
+
+edge_accuracy_mixed_presentation_network_plot <- plot(edge_accuracy_mixed_presentation_network, 
+                                      #plot = "interval",
+                                      # split0 = TRUE,
+                                      order = "sample",
+                                       labels = TRUE)
+
+edge_accuracy_mixed_presentation_network_plot
+
+# This function makes a ’multiverse’ plot of bootstrap results. Every row indicates an edge and every column a bootstrap; colors are in line of the edge strength as drawn with plot.bootnetResult.
+#multiverse(edge_accuracy_mixed_presentation_network_plot,
+#           labels = T) 
+```
+
+### mixed_presentation centrality accuracy
+```{r centrality accuracy mixed_presentation network}
+centrality_stability_mixed_presentation_network <- bootnet(mixed_presentation_network_bootnet,
+                                nBoots = 1000, 
+                                nCores = 1,
+                                type = "case", #case-dropping bootstrap
+                                statistics = c("closeness",
+                                               "strength",
+                                               "betweenness",
+                                               "expectedInfluence")) 
+
+centrality_stability_mixed_presentation_network
+
+# Table of all statistics from original sample 
+centrality_stability_mixed_presentation_network$sampleTable 
+
+# Results of bootstrap
+centrality_stability_mixed_presentation_network$boots
+
+# Table of all statistics from bootstraps
+centrality_stability_mixed_presentation_network$bootTable
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_stability_plot_mixed_presentation.png"))
+
+# Plot centrality stability
+plot(centrality_stability_mixed_presentation_network,
+                                              statistics = c("closeness",
+                                                             "strength",
+                                                             "betweenness",
+                                                             "expectedInfluence"))
+
+dev.off()
+
+centrality_stability_mixed_presentation_network_plot <- plot(centrality_stability_mixed_presentation_network,
+                                              statistics = c("closeness",
+                                                             "strength",
+                                                             "betweenness",
+                                                             "expectedInfluence"))
+
+centrality_stability_mixed_presentation_network_plot
+
+
+# CS-coefficient (to quantify the centrality stability)
+corStability(centrality_stability_mixed_presentation_network,
+              cor = 0.7,
+              statistics = "all")
+```
+
+### Test significance of differences (between edge weights and node centralities) to test for differences within a single network 
+Significance: Specific edge weights
+```{r test significance of differences of specific edge weight mixed_presentation network}
+# Plot significant differences (alpha = 0.05) of edge weights:
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_edges_plot_mixed_presentation.png"))
+
+plot(edge_accuracy_mixed_presentation_network,
+     "edge",
+     plot = "difference",
+     onlyNonZero = TRUE,
+     order = "sample",
+     labels = TRUE
+     )
+
+dev.off()
+```
+
+Significance: Node centralities
+```{r test significance of differences of node centralities mixed_presentation network}
+# Plot significant differences (alpha = 0.05) of node centrality eg. strength for all nodes:
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_node_centralities_plot_mixed_presentation.png"))
+
+plot(edge_accuracy_mixed_presentation_network,
+     "expectedInfluence",
+     plot = "difference",
+     order = "sample"
+     ) # Note: use edge accuracy estimates for this as centrality is a measure of connecting edges
+
+dev.off()
+# Test for difference in strength between specific nodes - perhaps more useful if you have apriori reason to explore specific differents in nodes
+# Eg. difference in centrality between ene and expectedInfluence for strength 
+# differenceTest(edge_accuracy_ED_network,  "ene", "rac", "expectedInfluence")
+```
+
+### (Do this last) Average layout
+Calculate average layout of all networks to then constrain them all to that layout (don't use Fruchterman-Reingold)
+```{r calculating average layout}
+# Rename objects used for plotting so that they don't get overwrote by the main network analysis environment
+sens_ANBP_network_plot <- ANBP_network_plot
+sens_BN_network_plot <- BN_network_plot
+
+sens_ANBP_network <- ANBP_network
+sens_BN_network <- BN_network
+
+sens_error_list_ANBP <- error_list_ANBP
+sens_error_list_BN <- error_list_BN
+
+sens_ANBPcommunities <- ANBPcommunities
+sens_BNcommunities <- BNcommunities
+
+sens_average_layout <- qgraph::averageLayout(sens_ANBP_network_plot,
+                                sens_BN_network_plot,
+                                BED_network_plot,
+                                mixed_presentation_network_plot)
+```
+
+Re-plot each using 'average_layout'
+```{r re-plot each using average layout}
+# ANBP
+ANBP_network_plot <- qgraph::qgraph(sens_ANBP_network$pairwise$wadj, # weighted adjacency matrix as input
+       layout = sens_average_layout, 
+       pie = sens_error_list_ANBP, # provide errors as input
+       pieColor = color_list,
+       edge.color = "blue3",
+       cut = 0, 
+       labels = shortnames,
+       nodeNames = longnames,
+       groups =  sens_ANBPcommunities,
+       color = c("orange",
+                 "light blue",
+                 "red",
+                 "grey" # covariates in grey
+                 ),
+       palette = "colorblind",
+       label.scale = T,
+       title = "Sensitivity analysis ('pure' groups): Network of mania symptoms in ANBP sample,
+                   n = 450",
+       filetype = "png",
+       filename = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_ANBP_average_layout"),
+       width = 10,
+       height = 10
+      )
+
+# BN
+BN_network_plot <- qgraph::qgraph(sens_BN_network$pairwise$wadj, # weighted adjacency matrix as input
+       layout = sens_average_layout, 
+       pie = sens_error_list_BN, # provide errors as input
+       pieColor = color_list,
+       edge.color = "blue3",
+       cut = 0, 
+       labels = shortnames,
+       nodeNames = longnames,
+       groups =  sens_BNcommunities,
+       palette = "colorblind",
+       color = c("orange",
+                 "light blue",
+                 "red",
+                 "green",
+                  "grey" # covariates in grey
+                 ),
+       label.scale = T,
+       title = "Sensitivity analysis ('pure' groups): Network of mania symptoms in BN sample,
+                   n = 5385",
+       filetype = "png",
+       filename = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_BN_average_layout"),
+       width = 10,
+       height = 10
+      )
+
+# BED
+BED_network_plot <- qgraph::qgraph(BED_network$pairwise$wadj, # weighted adjacency matrix as input
+       layout = sens_average_layout, 
+       pie = error_list_BED, # provide errors as input
+       pieColor = color_list,
+       edge.color = "blue3",
+       cut = 0, 
+       labels = shortnames,
+       nodeNames = longnames,
+       groups =  BEDcommunities,
+       palette = "colorblind",
+       color = c("orange",
+                 "light blue",
+                 "red",
+                  "grey" # covariates in grey
+                 ),
+       label.scale = T,
+       title = "Sensitivity analysis ('pure' groups): Network of mania symptoms in BED sample,
+                   n = 1389",
+       filetype = "png",
+       filename = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_BED_average_layout"),
+       width = 10,
+       height = 10
+      )
+
+# Mixed presentation
+mixed_presentation_network_plot <- qgraph::qgraph(mixed_presentation_network$pairwise$wadj, # weighted adjacency matrix as input
+       layout = sens_average_layout, 
+       pie = error_list_mixed_presentation, # provide errors as input
+       pieColor = color_list,
+       edge.color = "blue3",
+       cut = 0, 
+       labels = shortnames,
+       nodeNames = longnames,
+       groups =  mixed_presentationcommunities,
+       palette = "colorblind",
+       color = c("orange",
+                 "light blue",
+                  "grey" # covariates in grey
+                 ),
+       label.scale = T,
+       title = "Sensitivity analysis ('pure' groups): Network of mania symptoms in mixed presentation sample,
+                   n = 2,746",
+       filetype = "png",
+       filename = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_mixed_presentation_average_layout"),
+       width = 10,
+       height = 10
+      )
+```
+
+# DIAGNOSIS LEVEL- COMPARING NETWORKS
+## ANBP vs BN
+### 1. Correlation of the weighted adjacency matrix of both models
+```{r ANBP vs BN correlation of weighted adjacency matrices}
+# Drop age and sex from adjacency matrices
+ANBP_network_no_age_sex <- tril(ANBP_network_bootnet$graph) 
+ANBP_network_no_age_sex <- ANBP_network_no_age_sex[-c(14,15),-c(14,15)]
+diag(ANBP_network_no_age_sex) <- NA_real_
+ANBP_network_no_age_sex <- as.vector(ANBP_network_no_age_sex)
+
+BN_network_no_age_sex <- tril(BN_network_bootnet$graph) 
+BN_network_no_age_sex <- BN_network_no_age_sex[-c(14,15),-c(14,15)]
+diag(BN_network_no_age_sex) <- NA_real_
+BN_network_no_age_sex <- as.vector(BN_network_no_age_sex)
+
+corr_no_age_sex <- cor.test(x=ANBP_network_no_age_sex,
+                 y=BN_network_no_age_sex,
+                 method = 'spearman')
+
+corr_no_age_sex # 0.7
+corr_no_age_sex$p.value # 1.300678e-24
+```
+
+### 2. Absolute sum of adjacency matrices for the two networks [edge weights]
+```{r ANBP versus BN absolute sum of adjacency matrices}
+sum(abs(na.omit(BN_network_no_age_sex))) 
+sum(abs(na.omit(ANBP_network_no_age_sex)))
+```
+
+### 3. Compare centrality
+```{r ANBP vs BN compare centrality}
+# Plot centrality differences
+ANBP_vs_BN_centrality_plot <- centralityPlot(list( "Anorexia binge/purge" = ANBP_network_bootnet,
+               "Bulimia" = BN_network_bootnet),
+               include = "ExpectedInfluence",
+               orderBy = "ExpectedInfluence",
+               labels = longnames)
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_ANBP_vs_BN.png"))
+
+ANBP_vs_BN_centrality_plot + labs(x = "Centrality indices",
+            y = "Nodes",
+            colour = "Comparison group")
+
+dev.off()
+```
+
+### 4. Compare networks using the Network Comparison Test
+~runs 5000 networks with the same sample sizes as your original two, but randomly assigning people to each one.  Creates a distribution of the null hypothesis - this shows what our networks would look like assuming that ED does not matter. We then compare our actual network to this network. Then sees if the differences you found are bigger than random differences you get when you just split the sample into those size groups
+
+~the 5000 permutations are run, and the value of difference between the networks in each of the permutations is put into a distribution. That's the distribution that is then used to assess whether your original difference was big enough to be significant, if a larger difference is found only in less that 5% of permutations you conclude that the difference you found was just to your group allocation, not just to chance
+
+~if significant: significant over and above differences you get just comparing samples of X to samples of Y
+
+~ NCT uses information from edge weights; need to look at edge weight accuracy to ensure I can interpret NCT 
+
+```{r ANBP vs BN compare centrality Network Comparison Test}
+# Use output from estimatenetwork as data, that way specific settings eg. model and tuning are retained
+networkcomparison_ANBP_BN <- NCT(ANBP_network_bootnet,
+                         BN_network_bootnet,
+                         it = 1000, 
+                         test.edges = T,
+                         edges=list(c(1,2), # List all edges other than age and sex
+                                    c(1,3),
+                                    c(1,4),
+                                    c(1,5),
+                                    c(1,6),
+                                    c(1,7),
+                                    c(1,8),
+                                    c(1,9),
+                                    c(1,10),
+                                    c(1,11),
+                                    c(1,12),
+                                    c(1,13),
+           
+                                    c(2,3),
+                                    c(2,4),
+                                    c(2,5),
+                                    c(2,6),
+                                    c(2,7),
+                                    c(2,8),
+                                    c(2,9),
+                                    c(2,10),
+                                    c(2,11),
+                                    c(2,12),
+                                    c(2,13),
+           
+                                    c(3,4),
+                                    c(3,5),
+                                    c(3,6),
+                                    c(3,7),
+                                    c(3,8),
+                                    c(3,9),
+                                    c(3,10),
+                                    c(3,11),
+                                    c(3,12),
+                                    c(3,13),
+           
+                                    c(4,5),
+                                    c(4,6),
+                                    c(4,7),
+                                    c(4,8),
+                                    c(4,9),
+                                    c(4,10),
+                                    c(4,11),
+                                    c(4,12),
+                                    c(4,13),
+                                    
+                                    c(5,6),
+                                    c(5,7),
+                                    c(5,8),
+                                    c(5,9),
+                                    c(5,10),
+                                    c(5,11),
+                                    c(5,12),
+                                    c(5,13),
+          
+          
+                                    c(6,7),
+                                    c(6,8),
+                                    c(6,9),
+                                    c(6,10),
+                                    c(6,11),
+                                    c(6,12),
+                                    c(6,13),
+           
+                                    c(7,8),
+                                    c(7,9),
+                                    c(7,10),
+                                    c(7,11),
+                                    c(7,12),
+                                    c(7,13),
+           
+                                    c(8,9),
+                                    c(8,10),
+                                    c(8,11),
+                                    c(8,12),
+                                    c(8,13),
+          
+                                    c(9,10),
+                                    c(9,11),
+                                    c(9,12),
+                                    c(9,13),
+           
+                                    c(10,11),
+                                    c(10,12),
+                                    c(10,13),
+           
+                                    c(11,12),
+                                    c(11,13),
+                                    
+                                    c(12,13)
+                         ), 
+           
+                         test.centrality = TRUE,
+                         centrality = c("closeness",
+                                        "betweenness",
+                                        "strength",
+                                        "expectedInfluence"),
+                         nodes = 1:13, # List all nodes other than age and sex
+                         p.adjust.methods = "bonferroni"
+                         )
+
+networkcomparison_ANBP_BN
+```
+
+### 5. Global strength: ANBP versus BN differences 
+```{r ANBP versus BN Network Comparison Test results - global strength}
+networkcomparison_ANBP_BN$glstrinv.sep # global strength of each network - adding up all the networks in each network, is there a difference?
+networkcomparison_ANBP_BN$glstrinv.real # difference in global strength
+networkcomparison_ANBP_BN$glstrinv.pval # significance of difference in global strength
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_ANBP_vs_BN.png"))
+
+plot(networkcomparison_ANBP_BN, what = "strength") # the results of the global strength test can be plotted
+
+dev.off()
+```
+
+### 6. Network structure: ANBP versus BN differences 
+Results can also be plotted. The permutation test results in a reference distribution of test statistics under the relevant null hypothesis. NCT is accompanied by a plotting function to visualizethe results. The red triangle indicates the test statistics based on the observed (real) data.
+IF 0, just say p < 0.001
+```{r ANBP versus BN Network Comparison Test results - network structure}
+networkcomparison_ANBP_BN$nwinv.real # max difference in network structure
+networkcomparison_ANBP_BN$nwinv.pval # significance of difference in structure/organisation
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_ANBP_vs_BN.png"))
+
+plot(networkcomparison_ANBP_BN, # the results of the network structure test can be plotted
+     what = "network")
+
+dev.off()
+```
+
+### 6a. If significant - SPECIFIC EDGE WEIGHT DIFFERENCES 
+NB: When writing up, will need to refer back to the networks to see which edge weight was stronger and in which model. This only tells you if the difference was significant, not in which direction.
+```{r ANBP versus BN Network Comparison Test results - specific edge weights}
+networkcomparison_ANBP_BN$einv.real # difference in edge weights of observed networks
+networkcomparison_ANBP_BN$einv.pvals # The Holm-Bonferroni corrected p values per edge from the permutation test concerning differences in edges weight
+networkcomparison_ANBP_BN$einv.perm # The values of the difference in edge weight of the permuted networks. Only iftest.edges =TRUE 
+# plot(networkcomparison_ANBP_BN, # The distribution(s) of the edge strength invariance test can be plotted
+ #    what="edge")
+```
+
+### 7. Significant centrality differences
+```{r ANBP versus BN Network Comparison Test results - significant differences centrality}
+networkcomparison_ANBP_BN$diffcen.real # The values of the difference in centralities of the OBSERVED networks. 
+networkcomparison_ANBP_BN$diffcen.perm # The values of the difference in centralities of the PERMUTED networks. 
+networkcomparison_ANBP_BN$diffcen.pval # p-values (corrected for multiple testing or not according to ’p.adjust.methods’) per node from the permutation test concerning differences in centralities. 
+```
+
+## ANBP vs BED
+### 1. Correlation of the weighted adjacency matrix of both models
+```{r ANBP vs BED correlation of weighted adjacency matrices}
+# Drop age and sex from adjacency matrices
+BED_network_no_age_sex <- tril(BED_network_bootnet$graph) 
+BED_network_no_age_sex <- BED_network_no_age_sex[-c(14,15),-c(14,15)]
+diag(BED_network_no_age_sex) <- NA_real_
+BED_network_no_age_sex <- as.vector(BED_network_no_age_sex)
+
+corr_no_age_sex <- cor.test(x=ANBP_network_no_age_sex,
+                 y=BED_network_no_age_sex,
+                 method = 'spearman')
+
+corr_no_age_sex # 0.67
+corr_no_age_sex$p.value # 2.06603e-21
+```
+
+### 2. Absolute sum of adjacency matrices for the two networks [edge weights]
+```{r ANBP vs BED absolute sum of adjacency matrices}
+sum(abs(na.omit(BED_network_no_age_sex))) 
+sum(abs(na.omit(ANBP_network_no_age_sex)))
+```
+
+### 3. Compare centrality
+```{r ANBP vs BED compare centrality}
+# Plot centrality differences
+ANBP_vs_BED_centrality_plot <- centralityPlot(list( "Anorexia binge/purge" = ANBP_network_bootnet,
+               "Binge-eating disorder" = BED_network_bootnet),
+               include = "ExpectedInfluence",
+               orderBy = "ExpectedInfluence",
+               labels = longnames)
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_ANBP_vs_BED.png"))
+
+ANBP_vs_BED_centrality_plot + labs(x = "Centrality indices",
+            y = "Nodes",
+            colour = "Comparison group")
+
+dev.off()
+```
+
+### 4. Compare networks using the Network Comparison Test
+```{r ANBP vs BED compare centrality Network Comparison Test}
+# Use output from estimatenetwork as data, that way specific settings eg. model and tuning are retained
+networkcomparison_ANBP_BED <- NCT(ANBP_network_bootnet,
+                         BED_network_bootnet,
+                         it = 1000, 
+                         test.edges = T,
+                         edges=list(c(1,2), # List all edges other than age and sex
+                                    c(1,3),
+                                    c(1,4),
+                                    c(1,5),
+                                    c(1,6),
+                                    c(1,7),
+                                    c(1,8),
+                                    c(1,9),
+                                    c(1,10),
+                                    c(1,11),
+                                    c(1,12),
+                                    c(1,13),
+           
+                                    c(2,3),
+                                    c(2,4),
+                                    c(2,5),
+                                    c(2,6),
+                                    c(2,7),
+                                    c(2,8),
+                                    c(2,9),
+                                    c(2,10),
+                                    c(2,11),
+                                    c(2,12),
+                                    c(2,13),
+           
+                                    c(3,4),
+                                    c(3,5),
+                                    c(3,6),
+                                    c(3,7),
+                                    c(3,8),
+                                    c(3,9),
+                                    c(3,10),
+                                    c(3,11),
+                                    c(3,12),
+                                    c(3,13),
+           
+                                    c(4,5),
+                                    c(4,6),
+                                    c(4,7),
+                                    c(4,8),
+                                    c(4,9),
+                                    c(4,10),
+                                    c(4,11),
+                                    c(4,12),
+                                    c(4,13),
+                                    
+                                    c(5,6),
+                                    c(5,7),
+                                    c(5,8),
+                                    c(5,9),
+                                    c(5,10),
+                                    c(5,11),
+                                    c(5,12),
+                                    c(5,13),
+          
+          
+                                    c(6,7),
+                                    c(6,8),
+                                    c(6,9),
+                                    c(6,10),
+                                    c(6,11),
+                                    c(6,12),
+                                    c(6,13),
+           
+                                    c(7,8),
+                                    c(7,9),
+                                    c(7,10),
+                                    c(7,11),
+                                    c(7,12),
+                                    c(7,13),
+           
+                                    c(8,9),
+                                    c(8,10),
+                                    c(8,11),
+                                    c(8,12),
+                                    c(8,13),
+          
+                                    c(9,10),
+                                    c(9,11),
+                                    c(9,12),
+                                    c(9,13),
+           
+                                    c(10,11),
+                                    c(10,12),
+                                    c(10,13),
+           
+                                    c(11,12),
+                                    c(11,13),
+                                    
+                                    c(12,13)
+                         ), 
+           
+                         test.centrality = TRUE,
+                         centrality = c("closeness",
+                                        "betweenness",
+                                        "strength",
+                                        "expectedInfluence"),
+                         nodes = 1:13, # List all nodes other than age and sex
+                         p.adjust.methods = "bonferroni"
+                         )
+
+networkcomparison_ANBP_BED
+```
+
+### 5. Global strength: ANBP versus BED differences 
+```{r ANBP versus BED Network Comparison Test results - global strength}
+networkcomparison_ANBP_BED$glstrinv.sep # global strength of each network - adding up all the networks in each network, is there a difference?
+networkcomparison_ANBP_BED$glstrinv.real # difference in global strength
+networkcomparison_ANBP_BED$glstrinv.pval # significance of difference in global strength
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_ANBP_vs_BED.png"))
+
+plot(networkcomparison_ANBP_BED, what = "strength") # the results of the global strength test can be plotted
+
+dev.off()
+```
+
+### 6. Network structure: ANBP versus BED differences 
+Results can also be plotted. The permutation test results in a reference distribution of test statistics under the relevant null hypothesis. NCT is accompanied by a plotting function to visualizethe results. The red triangle indicates the test statistics based on the observed (real) data.
+IF 0, just say p < 0.001
+```{r ANBP versus BED Network Comparison Test results - network structure}
+networkcomparison_ANBP_BED$nwinv.real # max difference in network structure
+networkcomparison_ANBP_BED$nwinv.pval # significance of difference in structure/organisation
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_ANBP_vs_BED.png"))
+
+plot(networkcomparison_ANBP_BED, # the results of the network structure test can be plotted
+     what = "network")
+
+dev.off()
+```
+
+### 6a. If significant - SPECIFIC EDGE WEIGHT DIFFERENCES 
+NB: When writing up, will need to refer back to the networks to see which edge weight was stronger and in which model. This only tells you if the difference was significant, not in which direction.
+```{r ANBP versus BED Network Comparison Test results - specific edge weights}
+networkcomparison_ANBP_BED$einv.real # difference in edge weights of observed networks
+networkcomparison_ANBP_BED$einv.pvals # The Holm-Bonferroni corrected p values per edge from the permutation test concerning differences in edges weight
+networkcomparison_ANBP_BED$einv.perm # The values of the difference in edge weight of the permuted networks. Only iftest.edges =TRUE 
+# plot(networkcomparison_ANBP_BN, # The distribution(s) of the edge strength invariance test can be plotted
+ #    what="edge")
+```
+
+### 7. Significant centrality differences
+```{r ANBP versus BED Network Comparison Test results - significant differences centrality}
+networkcomparison_ANBP_BED$diffcen.real # The values of the difference in centralities of the OBSERVED networks. 
+networkcomparison_ANBP_BED$diffcen.perm # The values of the difference in centralities of the PERMUTED networks. 
+networkcomparison_ANBP_BED$diffcen.pval # p-values (corrected for multiple testing or not according to ’p.adjust.methods’) per node from the permutation test concerning differences in centralities. 
+```
+
+## BN vs BED
+### 1. Correlation of the weighted adjacency matrix of both models
+```{r BN vs BED correlation of weighted adjacency matrices}
+# Drop age and sex from adjacency matrices
+corr_no_age_sex <- cor.test(x=BN_network_no_age_sex,
+                 y=BED_network_no_age_sex,
+                 method = 'spearman')
+
+corr_no_age_sex # 0.87
+corr_no_age_sex$p.value # 3.973111e-48
+```
+
+### 2. Absolute sum of adjacency matrices for the two networks [edge weights]
+```{r BN vs BED absolute sum of adjacency matrices}
+sum(abs(na.omit(BED_network_no_age_sex))) 
+sum(abs(na.omit(BN_network_no_age_sex)))
+```
+
+### 3. Compare centrality
+```{r BN vs BED compare centrality}
+# Plot centrality differences
+BN_vs_BED_centrality_plot <- centralityPlot(list( "Bulimia" = BN_network_bootnet,
+               "Binge-eating disorder" = BED_network_bootnet),
+               include = "ExpectedInfluence",
+               orderBy = "ExpectedInfluence",
+               labels = longnames)
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_BN_vs_BED.png"))
+
+BN_vs_BED_centrality_plot + labs(x = "Centrality indices",
+            y = "Nodes",
+            colour = "Comparison group")
+
+dev.off()
+```
+
+### 4. Compare networks using the Network Comparison Test
+```{r BN vs BED compare centrality Network Comparison Test}
+# Use output from estimatenetwork as data, that way specific settings eg. model and tuning are retained
+networkcomparison_BN_BED <- NCT(BN_network_bootnet,
+                         BED_network_bootnet,
+                         it = 1000, 
+                         test.edges = T,
+                         edges=list(c(1,2), # List all edges other than age and sex
+                                    c(1,3),
+                                    c(1,4),
+                                    c(1,5),
+                                    c(1,6),
+                                    c(1,7),
+                                    c(1,8),
+                                    c(1,9),
+                                    c(1,10),
+                                    c(1,11),
+                                    c(1,12),
+                                    c(1,13),
+           
+                                    c(2,3),
+                                    c(2,4),
+                                    c(2,5),
+                                    c(2,6),
+                                    c(2,7),
+                                    c(2,8),
+                                    c(2,9),
+                                    c(2,10),
+                                    c(2,11),
+                                    c(2,12),
+                                    c(2,13),
+           
+                                    c(3,4),
+                                    c(3,5),
+                                    c(3,6),
+                                    c(3,7),
+                                    c(3,8),
+                                    c(3,9),
+                                    c(3,10),
+                                    c(3,11),
+                                    c(3,12),
+                                    c(3,13),
+           
+                                    c(4,5),
+                                    c(4,6),
+                                    c(4,7),
+                                    c(4,8),
+                                    c(4,9),
+                                    c(4,10),
+                                    c(4,11),
+                                    c(4,12),
+                                    c(4,13),
+                                    
+                                    c(5,6),
+                                    c(5,7),
+                                    c(5,8),
+                                    c(5,9),
+                                    c(5,10),
+                                    c(5,11),
+                                    c(5,12),
+                                    c(5,13),
+          
+          
+                                    c(6,7),
+                                    c(6,8),
+                                    c(6,9),
+                                    c(6,10),
+                                    c(6,11),
+                                    c(6,12),
+                                    c(6,13),
+           
+                                    c(7,8),
+                                    c(7,9),
+                                    c(7,10),
+                                    c(7,11),
+                                    c(7,12),
+                                    c(7,13),
+           
+                                    c(8,9),
+                                    c(8,10),
+                                    c(8,11),
+                                    c(8,12),
+                                    c(8,13),
+          
+                                    c(9,10),
+                                    c(9,11),
+                                    c(9,12),
+                                    c(9,13),
+           
+                                    c(10,11),
+                                    c(10,12),
+                                    c(10,13),
+           
+                                    c(11,12),
+                                    c(11,13),
+                                    
+                                    c(12,13)
+                         ), 
+           
+                         test.centrality = TRUE,
+                         centrality = c("closeness",
+                                        "betweenness",
+                                        "strength",
+                                        "expectedInfluence"),
+                         nodes = 1:13, # List all nodes other than age and sex
+                         p.adjust.methods = "bonferroni"
+                         )
+
+networkcomparison_BN_BED
+```
+
+### 5. Global strength: BN versus BED differences 
+```{r BN versus BED Network Comparison Test results - global strength}
+networkcomparison_BN_BED$glstrinv.sep # global strength of each network - adding up all the networks in each network, is there a difference?
+networkcomparison_BN_BED$glstrinv.real # difference in global strength
+networkcomparison_BN_BED$glstrinv.pval # significance of difference in global strength
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_BN_vs_BED.png"))
+
+plot(networkcomparison_BN_BED, what = "strength") # the results of the global strength test can be plotted
+
+dev.off()
+```
+
+### 6. Network structure: BN versus BED differences 
+Results can also be plotted. The permutation test results in a reference distribution of test statistics under the relevant null hypothesis. NCT is accompanied by a plotting function to visualizethe results. The red triangle indicates the test statistics based on the observed (real) data.
+IF 0, just say p < 0.001
+```{r BN versus BED Network Comparison Test results - network structure}
+networkcomparison_BN_BED$nwinv.real # max difference in network structure
+networkcomparison_BN_BED$nwinv.pval # significance of difference in structure/organisation
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_BN_vs_BED.png"))
+
+plot(networkcomparison_BN_BED, # the results of the network structure test can be plotted
+     what = "network")
+
+dev.off()
+```
+
+### 6a. If significant - SPECIFIC EDGE WEIGHT DIFFERENCES 
+NB: When writing up, will need to refer back to the networks to see which edge weight was stronger and in which model. This only tells you if the difference was significant, not in which direction.
+```{r BN versus BED Network Comparison Test results - specific edge weights}
+networkcomparison_BN_BED$einv.real # difference in edge weights of observed networks
+networkcomparison_BN_BED$einv.pvals # The Holm-Bonferroni corrected p values per edge from the permutation test concerning differences in edges weight
+networkcomparison_BN_BED$einv.perm # The values of the difference in edge weight of the permuted networks. Only iftest.edges =TRUE 
+# plot(networkcomparison_ANBP_BN, # The distribution(s) of the edge strength invariance test can be plotted
+ #    what="edge")
+```
+
+### 7. Significant centrality differences
+```{r BN versus BED  Network Comparison Test results - significant differences centrality}
+networkcomparison_BN_BED$diffcen.real # The values of the difference in centralities of the OBSERVED networks. 
+networkcomparison_BN_BED$diffcen.perm # The values of the difference in centralities of the PERMUTED networks. 
+networkcomparison_BN_BED$diffcen.pval # p-values (corrected for multiple testing or not according to ’p.adjust.methods’) per node from the permutation test concerning differences in centralities. 
+```
+
+
+
+## ANBP vs mixed presentation
+### 1. Correlation of the weighted adjacency matrix of both models
+```{r ANBP vs mixed_presentation correlation of weighted adjacency matrices}
+# Drop age and sex from adjacency matrices
+ANBP_network_no_age_sex <- tril(ANBP_network_bootnet$graph) 
+ANBP_network_no_age_sex <- ANBP_network_no_age_sex[-c(14,15),-c(14,15)]
+diag(ANBP_network_no_age_sex) <- NA_real_
+ANBP_network_no_age_sex <- as.vector(ANBP_network_no_age_sex)
+
+mixed_presentation_network_no_age_sex <- tril(mixed_presentation_network_bootnet$graph) 
+mixed_presentation_network_no_age_sex <- mixed_presentation_network_no_age_sex[-c(14,15),-c(14,15)]
+diag(mixed_presentation_network_no_age_sex) <- NA_real_
+mixed_presentation_network_no_age_sex <- as.vector(mixed_presentation_network_no_age_sex)
+
+corr_no_age_sex <- cor.test(x=ANBP_network_no_age_sex,
+                 y=mixed_presentation_network_no_age_sex,
+                 method = 'spearman')
+
+corr_no_age_sex # 0.7
+corr_no_age_sex$p.value # 1.300678e-24
+```
+
+### 2. Absolute sum of adjacency matrices for the two networks [edge weights]
+```{r ANBP versus mixed_presentation absolute sum of adjacency matrices}
+sum(abs(na.omit(mixed_presentation_network_no_age_sex))) 
+sum(abs(na.omit(ANBP_network_no_age_sex)))
+```
+
+### 3. Compare centrality
+```{r ANBP vs mixed_presentation compare centrality}
+# Plot centrality differences
+ANBP_vs_mixed_presentation_centrality_plot <- centralityPlot(list( "Anorexia binge/purge" = ANBP_network_bootnet,
+               "Mixed presentation" = mixed_presentation_network_bootnet),
+               include = "ExpectedInfluence",
+               orderBy = "ExpectedInfluence",
+               labels = longnames)
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_ANBP_vs_mixed_presentation.png"))
+
+ANBP_vs_mixed_presentation_centrality_plot + labs(x = "Centrality indices",
+            y = "Nodes",
+            colour = "Comparison group")
+
+dev.off()
+```
+
+### 4. Compare networks using the Network Comparison Test
+~runs 5000 networks with the same sample sizes as your original two, but randomly assigning people to each one.  Creates a distribution of the null hypothesis - this shows what our networks would look like assuming that ED does not matter. We then compare our actual network to this network. Then sees if the differences you found are bigger than random differences you get when you just split the sample into those size groups
+
+~the 5000 permutations are run, and the value of difference between the networks in each of the permutations is put into a distribution. That's the distribution that is then used to assess whether your original difference was big enough to be significant, if a larger difference is found only in less that 5% of permutations you conclude that the difference you found was just to your group allocation, not just to chance
+
+~if significant: significant over and above differences you get just comparing samples of X to samples of Y
+
+~ NCT uses information from edge weights; need to look at edge weight accuracy to ensure I can interpret NCT 
+
+```{r ANBP vs mixed_presentation compare centrality Network Comparison Test}
+# Use output from estimatenetwork as data, that way specific settings eg. model and tuning are retained
+networkcomparison_ANBP_mixed_presentation <- NCT(ANBP_network_bootnet,
+                         mixed_presentation_network_bootnet,
+                         it = 1000,
+                         test.edges = T,
+                         edges=list(c(1,2), # List all edges other than age and sex
+                                    c(1,3),
+                                    c(1,4),
+                                    c(1,5),
+                                    c(1,6),
+                                    c(1,7),
+                                    c(1,8),
+                                    c(1,9),
+                                    c(1,10),
+                                    c(1,11),
+                                    c(1,12),
+                                    c(1,13),
+           
+                                    c(2,3),
+                                    c(2,4),
+                                    c(2,5),
+                                    c(2,6),
+                                    c(2,7),
+                                    c(2,8),
+                                    c(2,9),
+                                    c(2,10),
+                                    c(2,11),
+                                    c(2,12),
+                                    c(2,13),
+           
+                                    c(3,4),
+                                    c(3,5),
+                                    c(3,6),
+                                    c(3,7),
+                                    c(3,8),
+                                    c(3,9),
+                                    c(3,10),
+                                    c(3,11),
+                                    c(3,12),
+                                    c(3,13),
+           
+                                    c(4,5),
+                                    c(4,6),
+                                    c(4,7),
+                                    c(4,8),
+                                    c(4,9),
+                                    c(4,10),
+                                    c(4,11),
+                                    c(4,12),
+                                    c(4,13),
+                                    
+                                    c(5,6),
+                                    c(5,7),
+                                    c(5,8),
+                                    c(5,9),
+                                    c(5,10),
+                                    c(5,11),
+                                    c(5,12),
+                                    c(5,13),
+          
+          
+                                    c(6,7),
+                                    c(6,8),
+                                    c(6,9),
+                                    c(6,10),
+                                    c(6,11),
+                                    c(6,12),
+                                    c(6,13),
+           
+                                    c(7,8),
+                                    c(7,9),
+                                    c(7,10),
+                                    c(7,11),
+                                    c(7,12),
+                                    c(7,13),
+           
+                                    c(8,9),
+                                    c(8,10),
+                                    c(8,11),
+                                    c(8,12),
+                                    c(8,13),
+          
+                                    c(9,10),
+                                    c(9,11),
+                                    c(9,12),
+                                    c(9,13),
+           
+                                    c(10,11),
+                                    c(10,12),
+                                    c(10,13),
+           
+                                    c(11,12),
+                                    c(11,13),
+                                    
+                                    c(12,13)
+                         ), 
+           
+                         test.centrality = TRUE,
+                         centrality = c("closeness",
+                                        "betweenness",
+                                        "strength",
+                                        "expectedInfluence"),
+                         nodes = 1:13, # List all nodes other than age and sex
+                         p.adjust.methods = "bonferroni"
+                         )
+
+networkcomparison_ANBP_mixed_presentation
+```
+
+### 5. Global strength: ANBP versus mixed_presentation differences 
+```{r ANBP versus mixed_presentation Network Comparison Test results - global strength}
+networkcomparison_ANBP_mixed_presentation$glstrinv.sep # global strength of each network - adding up all the networks in each network, is there a difference?
+networkcomparison_ANBP_mixed_presentation$glstrinv.real # difference in global strength
+networkcomparison_ANBP_mixed_presentation$glstrinv.pval # significance of difference in global strength
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_ANBP_vs_mixed_presentation.png"))
+
+plot(networkcomparison_ANBP_mixed_presentation, what = "strength") # the results of the global strength test can be plotted
+
+dev.off()
+```
+
+### 6. Network structure: ANBP versus mixed_presentation differences 
+Results can also be plotted. The permutation test results in a reference distribution of test statistics under the relevant null hypothesis. NCT is accompanied by a plotting function to visualizethe results. The red triangle indicates the test statistics based on the observed (real) data.
+IF 0, just say p < 0.001
+```{r ANBP versus mixed_presentation Network Comparison Test results - network structure}
+networkcomparison_ANBP_mixed_presentation$nwinv.real # max difference in network structure
+networkcomparison_ANBP_mixed_presentation$nwinv.pval # significance of difference in structure/organisation
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_ANBP_vs_mixed_presentation.png"))
+
+plot(networkcomparison_ANBP_mixed_presentation, # the results of the network structure test can be plotted
+     what = "network")
+
+dev.off()
+```
+
+### 6a. If significant - SPECIFIC EDGE WEIGHT DIFFERENCES 
+NB: When writing up, will need to refer back to the networks to see which edge weight was stronger and in which model. This only tells you if the difference was significant, not in which direction.
+```{r ANBP versus mixed_presentation Network Comparison Test results - specific edge weights}
+networkcomparison_ANBP_mixed_presentation$einv.real # difference in edge weights of observed networks
+networkcomparison_ANBP_mixed_presentation$einv.pvals # The Holm-Bonferroni corrected p values per edge from the permutation test concerning differences in edges weight
+networkcomparison_ANBP_mixed_presentation$einv.perm # The values of the difference in edge weight of the permuted networks. Only iftest.edges =TRUE 
+# plot(networkcomparison_ANBP_mixed_presentation, # The distribution(s) of the edge strength invariance test can be plotted
+ #    what="edge")
+
+edge_accuracy_ANBP_network$sampleTable
+edge_accuracy_mixed_presentation_network$sampleTable
+```
+
+### 7. Significant centrality differences
+```{r ANBP versus mixed_presentation Network Comparison Test results - significant differences centrality}
+networkcomparison_ANBP_mixed_presentation$diffcen.real # The values of the difference in centralities of the OBSERVED networks. 
+networkcomparison_ANBP_mixed_presentation$diffcen.perm # The values of the difference in centralities of the PERMUTED networks. 
+networkcomparison_ANBP_mixed_presentation$diffcen.pval # p-values (corrected for multiple testing or not according to ’p.adjust.methods’) per node from the permutation test concerning differences in centralities. 
+```
+
+## BED vs mixed presentation
+### 1. Correlation of the weighted adjacency matrix of both models
+```{r mixed_presentation vs BED correlation of weighted adjacency matrices}
+# Drop age and sex from adjacency matrices
+BED_network_no_age_sex <- tril(BED_network_bootnet$graph) 
+BED_network_no_age_sex <- BED_network_no_age_sex[-c(14,15),-c(14,15)]
+diag(BED_network_no_age_sex) <- NA_real_
+BED_network_no_age_sex <- as.vector(BED_network_no_age_sex)
+
+corr_no_age_sex <- cor.test(x=mixed_presentation_network_no_age_sex,
+                 y=BED_network_no_age_sex,
+                 method = 'spearman')
+
+corr_no_age_sex # 0.67
+corr_no_age_sex$p.value # 2.06603e-21
+```
+
+### 2. Absolute sum of adjacency matrices for the two networks [edge weights]
+```{r mixed_presentation vs BED absolute sum of adjacency matrices}
+sum(abs(na.omit(BED_network_no_age_sex))) 
+sum(abs(na.omit(mixed_presentation_network_no_age_sex)))
+```
+
+### 3. Compare centrality
+```{r mixed_presentation vs BED compare centrality}
+# Plot centrality differences
+mixed_presentation_vs_BED_centrality_plot <- centralityPlot(list( "Anorexia binge/purge" = mixed_presentation_network_bootnet,
+               "Binge-eating disorder" = BED_network_bootnet),
+               include = "ExpectedInfluence",
+               orderBy = "ExpectedInfluence",
+               labels = longnames)
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_mixed_presentation_vs_BED.png"))
+
+mixed_presentation_vs_BED_centrality_plot + labs(x = "Centrality indices",
+            y = "Nodes",
+            colour = "Comparison group")
+
+dev.off()
+```
+
+### 4. Compare networks using the Network Comparison Test
+```{r mixed_presentation vs BED compare centrality Network Comparison Test}
+# Use output from estimatenetwork as data, that way specific settings eg. model and tuning are retained
+networkcomparison_mixed_presentation_BED <- NCT(mixed_presentation_network_bootnet,
+                         BED_network_bootnet,
+                         it = 1000, 
+                         test.edges = T,
+                         edges=list(c(1,2), # List all edges other than age and sex
+                                    c(1,3),
+                                    c(1,4),
+                                    c(1,5),
+                                    c(1,6),
+                                    c(1,7),
+                                    c(1,8),
+                                    c(1,9),
+                                    c(1,10),
+                                    c(1,11),
+                                    c(1,12),
+                                    c(1,13),
+           
+                                    c(2,3),
+                                    c(2,4),
+                                    c(2,5),
+                                    c(2,6),
+                                    c(2,7),
+                                    c(2,8),
+                                    c(2,9),
+                                    c(2,10),
+                                    c(2,11),
+                                    c(2,12),
+                                    c(2,13),
+           
+                                    c(3,4),
+                                    c(3,5),
+                                    c(3,6),
+                                    c(3,7),
+                                    c(3,8),
+                                    c(3,9),
+                                    c(3,10),
+                                    c(3,11),
+                                    c(3,12),
+                                    c(3,13),
+           
+                                    c(4,5),
+                                    c(4,6),
+                                    c(4,7),
+                                    c(4,8),
+                                    c(4,9),
+                                    c(4,10),
+                                    c(4,11),
+                                    c(4,12),
+                                    c(4,13),
+                                    
+                                    c(5,6),
+                                    c(5,7),
+                                    c(5,8),
+                                    c(5,9),
+                                    c(5,10),
+                                    c(5,11),
+                                    c(5,12),
+                                    c(5,13),
+          
+          
+                                    c(6,7),
+                                    c(6,8),
+                                    c(6,9),
+                                    c(6,10),
+                                    c(6,11),
+                                    c(6,12),
+                                    c(6,13),
+           
+                                    c(7,8),
+                                    c(7,9),
+                                    c(7,10),
+                                    c(7,11),
+                                    c(7,12),
+                                    c(7,13),
+           
+                                    c(8,9),
+                                    c(8,10),
+                                    c(8,11),
+                                    c(8,12),
+                                    c(8,13),
+          
+                                    c(9,10),
+                                    c(9,11),
+                                    c(9,12),
+                                    c(9,13),
+           
+                                    c(10,11),
+                                    c(10,12),
+                                    c(10,13),
+           
+                                    c(11,12),
+                                    c(11,13),
+                                    
+                                    c(12,13)
+                         ), 
+           
+                         test.centrality = TRUE,
+                         centrality = c("closeness",
+                                        "betweenness",
+                                        "strength",
+                                        "expectedInfluence"),
+                         nodes = 1:13, # List all nodes other than age and sex
+                         p.adjust.methods = "bonferroni"
+                         )
+
+networkcomparison_mixed_presentation_BED
+```
+
+### 5. Global strength: mixed_presentation versus BED differences 
+```{r mixed_presentation versus BED Network Comparison Test results - global strength}
+networkcomparison_mixed_presentation_BED$glstrinv.sep # global strength of each network - adding up all the networks in each network, is there a difference?
+networkcomparison_mixed_presentation_BED$glstrinv.real # difference in global strength
+networkcomparison_mixed_presentation_BED$glstrinv.pval # significance of difference in global strength
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_mixed_presentation_vs_BED.png"))
+
+plot(networkcomparison_mixed_presentation_BED, what = "strength") # the results of the global strength test can be plotted
+
+dev.off()
+```
+
+### 6. Network structure: mixed_presentation versus BED differences 
+Results can also be plotted. The permutation test results in a reference distribution of test statistics under the relevant null hypothesis. NCT is accompanied by a plotting function to visualizethe results. The red triangle indicates the test statistics based on the observed (real) data.
+IF 0, just say p < 0.001
+```{r mixed_presentation versus BED Network Comparison Test results - network structure}
+networkcomparison_mixed_presentation_BED$nwinv.real # max difference in network structure
+networkcomparison_mixed_presentation_BED$nwinv.pval # significance of difference in structure/organisation
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_mixed_presentation_vs_BED.png"))
+
+plot(networkcomparison_mixed_presentation_BED, # the results of the network structure test can be plotted
+     what = "network")
+
+dev.off()
+```
+
+### 6a. If significant - SPECIFIC EDGE WEIGHT DIFFERENCES 
+NB: When writing up, will need to refer back to the networks to see which edge weight was stronger and in which model. This only tells you if the difference was significant, not in which direction.
+```{r mixed_presentation versus BED Network Comparison Test results - specific edge weights}
+networkcomparison_mixed_presentation_BED$einv.real # difference in edge weights of observed networks
+networkcomparison_mixed_presentation_BED$einv.pvals # The Holm-Bonferroni corrected p values per edge from the permutation test concerning differences in edges weight
+networkcomparison_mixed_presentation_BED$einv.perm # The values of the difference in edge weight of the permuted networks. Only iftest.edges =TRUE 
+# plot(networkcomparison_mixed_presentation_mixed_presentation, # The distribution(s) of the edge strength invariance test can be plotted
+ #    what="edge")
+```
+
+### 7. Significant centrality differences
+```{r mixed_presentation versus BED Network Comparison Test results - significant differences centrality}
+networkcomparison_mixed_presentation_BED$diffcen.real # The values of the difference in centralities of the OBSERVED networks. 
+networkcomparison_mixed_presentation_BED$diffcen.perm # The values of the difference in centralities of the PERMUTED networks. 
+networkcomparison_mixed_presentation_BED$diffcen.pval # p-values (corrected for multiple testing or not according to ’p.adjust.methods’) per node from the permutation test concerning differences in centralities. 
+```
+
+## BN vs Mixed presentation 
+### 1. Correlation of the weighted adjacency matrix of both models
+```{r mixed_presentation vs BN correlation of weighted adjacency matrices}
+# Drop age and sex from adjacency matrices
+mixed_presentation_network_no_age_sex <- tril(mixed_presentation_network_bootnet$graph) 
+mixed_presentation_network_no_age_sex <- mixed_presentation_network_no_age_sex[-c(14,15),-c(14,15)]
+diag(mixed_presentation_network_no_age_sex) <- NA_real_
+mixed_presentation_network_no_age_sex <- as.vector(mixed_presentation_network_no_age_sex)
+
+BN_network_no_age_sex <- tril(BN_network_bootnet$graph) 
+BN_network_no_age_sex <- BN_network_no_age_sex[-c(14,15),-c(14,15)]
+diag(BN_network_no_age_sex) <- NA_real_
+BN_network_no_age_sex <- as.vector(BN_network_no_age_sex)
+
+corr_no_age_sex <- cor.test(x=mixed_presentation_network_no_age_sex,
+                 y=BN_network_no_age_sex,
+                 method = 'spearman')
+
+corr_no_age_sex # 0.7
+corr_no_age_sex$p.value # 1.300678e-24
+```
+
+### 2. Absolute sum of adjacency matrices for the two networks [edge weights]
+```{r mixed_presentation versus BN absolute sum of adjacency matrices}
+sum(abs(na.omit(BN_network_no_age_sex))) 
+sum(abs(na.omit(mixed_presentation_network_no_age_sex)))
+```
+
+### 3. Compare centrality
+```{r mixed_presentation vs BN compare centrality}
+# Plot centrality differences
+mixed_presentation_vs_BN_centrality_plot <- centralityPlot(list( "Mixed presentation" = mixed_presentation_network_bootnet,
+               "Bulimia" = BN_network_bootnet),
+               include = "ExpectedInfluence",
+               orderBy = "ExpectedInfluence",
+               labels = longnames)
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_mixed_presentation_vs_BN.png"))
+
+mixed_presentation_vs_BN_centrality_plot + labs(x = "Centrality indices",
+            y = "Nodes",
+            colour = "Comparison group")
+
+dev.off()
+```
+
+### 4. Compare networks using the Network Comparison Test
+~runs 5000 networks with the same sample sizes as your original two, but randomly assigning people to each one.  Creates a distribution of the null hypothesis - this shows what our networks would look like assuming that ED does not matter. We then compare our actual network to this network. Then sees if the differences you found are bigger than random differences you get when you just split the sample into those size groups
+
+~the 5000 permutations are run, and the value of difference between the networks in each of the permutations is put into a distribution. That's the distribution that is then used to assess whether your original difference was big enough to be significant, if a larger difference is found only in less that 5% of permutations you conclude that the difference you found was just to your group allocation, not just to chance
+
+~if significant: significant over and above differences you get just comparing samples of X to samples of Y
+
+~ NCT uses information from edge weights; need to look at edge weight accuracy to ensure I can interpret NCT 
+
+```{r mixed_presentation vs BN compare centrality Network Comparison Test}
+# Use output from estimatenetwork as data, that way specific settings eg. model and tuning are retained
+networkcomparison_mixed_presentation_BN <- NCT(mixed_presentation_network_bootnet,
+                         BN_network_bootnet,
+                         it = 1000, # Do 5000
+                         test.edges = T,
+                         edges=list(c(1,2), # List all edges other than age and sex
+                                    c(1,3),
+                                    c(1,4),
+                                    c(1,5),
+                                    c(1,6),
+                                    c(1,7),
+                                    c(1,8),
+                                    c(1,9),
+                                    c(1,10),
+                                    c(1,11),
+                                    c(1,12),
+                                    c(1,13),
+           
+                                    c(2,3),
+                                    c(2,4),
+                                    c(2,5),
+                                    c(2,6),
+                                    c(2,7),
+                                    c(2,8),
+                                    c(2,9),
+                                    c(2,10),
+                                    c(2,11),
+                                    c(2,12),
+                                    c(2,13),
+           
+                                    c(3,4),
+                                    c(3,5),
+                                    c(3,6),
+                                    c(3,7),
+                                    c(3,8),
+                                    c(3,9),
+                                    c(3,10),
+                                    c(3,11),
+                                    c(3,12),
+                                    c(3,13),
+           
+                                    c(4,5),
+                                    c(4,6),
+                                    c(4,7),
+                                    c(4,8),
+                                    c(4,9),
+                                    c(4,10),
+                                    c(4,11),
+                                    c(4,12),
+                                    c(4,13),
+                                    
+                                    c(5,6),
+                                    c(5,7),
+                                    c(5,8),
+                                    c(5,9),
+                                    c(5,10),
+                                    c(5,11),
+                                    c(5,12),
+                                    c(5,13),
+          
+          
+                                    c(6,7),
+                                    c(6,8),
+                                    c(6,9),
+                                    c(6,10),
+                                    c(6,11),
+                                    c(6,12),
+                                    c(6,13),
+           
+                                    c(7,8),
+                                    c(7,9),
+                                    c(7,10),
+                                    c(7,11),
+                                    c(7,12),
+                                    c(7,13),
+           
+                                    c(8,9),
+                                    c(8,10),
+                                    c(8,11),
+                                    c(8,12),
+                                    c(8,13),
+          
+                                    c(9,10),
+                                    c(9,11),
+                                    c(9,12),
+                                    c(9,13),
+           
+                                    c(10,11),
+                                    c(10,12),
+                                    c(10,13),
+           
+                                    c(11,12),
+                                    c(11,13),
+                                    
+                                    c(12,13)
+                         ), 
+           
+                         test.centrality = TRUE,
+                         centrality = c("closeness",
+                                        "betweenness",
+                                        "strength",
+                                        "expectedInfluence"),
+                         nodes = 1:13, # List all nodes other than age and sex
+                         p.adjust.methods = "bonferroni"
+                         )
+
+networkcomparison_mixed_presentation_BN
+```
+
+### 5. Global strength: mixed_presentation versus BN differences 
+```{r mixed_presentation versus BN Network Comparison Test results - global strength}
+networkcomparison_mixed_presentation_BN$glstrinv.sep # global strength of each network - adding up all the networks in each network, is there a difference?
+networkcomparison_mixed_presentation_BN$glstrinv.real # difference in global strength
+networkcomparison_mixed_presentation_BN$glstrinv.pval # significance of difference in global strength
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_mixed_presentation_vs_BN.png"))
+
+plot(networkcomparison_mixed_presentation_BN, what = "strength") # the results of the global strength test can be plotted
+
+dev.off()
+```
+
+### 6. Network structure: mixed_presentation versus BN differences 
+Results can also be plotted. The permutation test results in a reference distribution of test statistics under the relevant null hypothesis. NCT is accompanied by a plotting function to visualizethe results. The red triangle indicates the test statistics based on the observed (real) data.
+IF 0, just say p < 0.001
+```{r mixed_presentation versus BN Network Comparison Test results - network structure}
+networkcomparison_mixed_presentation_BN$nwinv.real # max difference in network structure
+networkcomparison_mixed_presentation_BN$nwinv.pval # significance of difference in structure/organisation
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_mixed_presentation_vs_BN.png"))
+
+plot(networkcomparison_mixed_presentation_BN, # the results of the network structure test can be plotted
+     what = "network")
+
+dev.off()
+```
+
+### 6a. If significant - SPECIFIC EDGE WEIGHT DIFFERENCES 
+NB: When writing up, will need to refer back to the networks to see which edge weight was stronger and in which model. This only tells you if the difference was significant, not in which direction.
+```{r mixed_presentation versus BN Network Comparison Test results - specific edge weights}
+networkcomparison_mixed_presentation_BN$einv.real # difference in edge weights of observed networks
+networkcomparison_mixed_presentation_BN$einv.pvals # The Holm-Bonferroni corrected p values per edge from the permutation test concerning differences in edges weight
+networkcomparison_mixed_presentation_BN$einv.perm # The values of the difference in edge weight of the permuted networks. Only iftest.edges =TRUE 
+# plot(networkcomparison_mixed_presentation_BN, # The distribution(s) of the edge strength invariance test can be plotted
+ #    what="edge")
+```
+
+### 7. Significant centrality differences
+```{r mixed_presentation versus BN Network Comparison Test results - significant differences centrality}
+networkcomparison_mixed_presentation_BN$diffcen.real # The values of the difference in centralities of the OBSERVED networks. 
+networkcomparison_mixed_presentation_BN$diffcen.perm # The values of the difference in centralities of the PERMUTED networks. 
+networkcomparison_mixed_presentation_BN$diffcen.pval # p-values (corrected for multiple testing or not according to ’p.adjust.methods’) per node from the permutation test concerning differences in centralities. 
+```
+
+# Compare centrality indices: MULTIPLE COMPARISONS
+```{r Compare centrality indicies both}
+centralityplot <- centralityPlot(list("Anorexia nervosa binge-eating/purging (only)" = ANBP_network_bootnet,
+                                      "Bulimia nervosa (only)" = BN_network_bootnet,
+                                      "Binge-eating disorder (only)" = BED_network_bootnet,
+                                      "Mixed presentation" = mixed_presentation_network_bootnet),
+                                      include = "ExpectedInfluence",
+                                      orderBy = "ExpectedInfluence",
+                                      labels = longnames)
+
+png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/centrality_diff_ANBP_BN_BED_sens_pure_ED_groups.png"))
+
+centralityplot + 
+   labs(x = "Centrality indices",
+            y = "Nodes",
+            colour = "Comparison group")
+
+dev.off()
+```

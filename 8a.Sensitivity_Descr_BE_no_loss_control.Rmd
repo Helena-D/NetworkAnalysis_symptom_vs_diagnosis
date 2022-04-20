@@ -1,0 +1,1609 @@
+---
+title: "Descriptives: BE no loss of control"
+author: "Helena Davies"
+date: "11/01/2022"
+output: html_document
+---
+
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = '',
+  prompt = FALSE,
+  cache = FALSE
+  )
+```
+
+Clear global environment prior to initiation
+```{r Clear global environment}
+remove(list = ls())
+```
+
+Read in file with path to data channel
+```{r Read in file with path to data channel on teams}
+source(file = "../credentials/paths.R")
+```
+
+Add the add_numeric function - used to convert character variables into numeric variables
+Add the remove_duplicates function - used to deduplicate and remove NAs from IDs
+Add the sumscores function - used to generate sumscores
+Add the package_check function - used to install and load dependencies
+Add the imp_check function - used to check variables for implausible values
+```{r Read in functions}
+source(file = paste0(filepath_functions, "add_numeric.R"))
+source(file = paste0(filepath_functions, "remove_duplicates.R"))
+source(file = paste0(filepath_functions, "package_check.R"))
+source("./functions.R")
+```
+
+Use package_check to install and load dependencies
+Load tidyverse last
+```{r Install load dependencies}
+packages <- c("summarytools",
+              "sjlabelled",
+              "Amelia",
+              "gtsummary",
+              "janitor",
+              "psych",
+              "corrplot",
+              "rstatix",
+              "networktools",
+              "nnet",
+              "bootnet",
+              "caret",
+              "Matrix",
+              "qgraph",
+              "NetworkComparisonTest",
+              "tidyverse")
+package_check(packages)
+```
+
+Retrieve recent date
+We are using the recent date to save files with paste0() as an extension to not overwrite old versions
+```{r Recent date}
+date <- Sys.Date()
+date
+```
+
+# Read in merged data with variables created
+Read in data 
+```{r Read in data}
+# Symptom dat
+symptom_dat <- readRDS(file = "../data/symptom_dat_analysis2022-03-15.rds")
+dim(symptom_dat)
+colnames(symptom_dat)
+
+# Select and rename variables
+symptom_dat <- symptom_dat %>%
+  select(
+    ID,
+    ethnicity,
+    sex = sex_final,
+    sex_numeric = sex_final_numeric,
+    racially_minoritised,
+
+   # BE no loss of control variables (sens)
+    age_sens = age_sx_level_sens,
+    highest_education_sens = highest_education_sx_level_sens,
+    bmi_signup_sens = bmi_signup_sx_level_sens,
+    bmi_lowest_sens =bmi_lowest_sx_level_sens,
+    bmi_highest_sens = bmi_highest_sx_level_sens,
+   
+    more_hyperactivity_sens = more_hyperactivity_sx_level_sens,
+    more_irritability_sens= more_irritability_sx_level_sens,
+    more_self_confidence_sens = more_self_confidence_sx_level_sens,
+    less_sleep_sens = less_sleep_sx_level_sens,                    
+    more_talkative_sens = more_talkative_sx_level_sens,
+    racing_thoughts_sens = racing_thoughts_sx_level_sens,
+    conc_difficulties_sens = conc_difficulties_sx_level_sens,    
+    more_energy_sens = more_energy_sx_level_sens,
+    more_active_sens = more_active_sx_level_sens,
+    more_social_sens = more_social_sx_level_sens,             
+    higher_libido_sens = higher_libido_sx_level_sens,
+    more_risky_beh_sens = more_risky_beh_sx_level_sens,
+    reckless_spending_sens = reckless_spending_sx_level_sens,
+   
+   more_hyperactivity_numeric_sens = more_hyperactivity_numeric_sx_level_sens,
+   more_irritability_numeric_sens= more_irritability_numeric_sx_level_sens,
+   more_self_confidence_numeric_sens = more_self_confidence_numeric_sx_level_sens,
+   less_sleep_numeric_sens = less_sleep_numeric_sx_level_sens,                    
+   more_talkative_numeric_sens = more_talkative_numeric_sx_level_sens,
+   racing_thoughts_numeric_sens = racing_thoughts_numeric_sx_level_sens,
+   conc_difficulties_numeric_sens = conc_difficulties_numeric_sx_level_sens,     
+   more_energy_numeric_sens = more_energy_numeric_sx_level_sens,
+   more_active_numeric_sens = more_active_numeric_sx_level_sens,
+   more_social_numeric_sens = more_social_numeric_sx_level_sens,             
+   higher_libido_numeric_sens = higher_libido_numeric_sx_level_sens,
+   more_risky_beh_numeric_sens = more_risky_beh_numeric_sx_level_sens,
+   reckless_spending_numeric_sens = reckless_spending_numeric_sx_level_sens,
+   
+   # Main analysis variables 
+    age_main = age_sx_level,
+    highest_education_main = highest_education_sx_level,
+    bmi_signup_main = bmi_signup_sx_level,
+    bmi_lowest_main =bmi_lowest_sx_level,
+    bmi_highest_main = bmi_highest_sx_level,
+   
+    more_hyperactivity_main = more_hyperactivity_sx_level,
+    more_irritability_main= more_irritability_sx_level,
+    more_self_confidence_main = more_self_confidence_sx_level,
+    less_sleep_main = less_sleep_sx_level,                    
+    more_talkative_main = more_talkative_sx_level,
+    racing_thoughts_main = racing_thoughts_sx_level,
+    conc_difficulties_main = conc_difficulties_sx_level,    
+    more_energy_main = more_energy_sx_level,
+    more_active_main = more_active_sx_level,
+    more_social_main = more_social_sx_level,             
+    higher_libido_main = higher_libido_sx_level,
+    more_risky_beh_main = more_risky_beh_sx_level,
+    reckless_spending_main = reckless_spending_sx_level,
+   
+   more_hyperactivity_numeric_main = more_hyperactivity_numeric_sx_level,
+   more_irritability_numeric_main= more_irritability_numeric_sx_level,
+   more_self_confidence_numeric_main = more_self_confidence_numeric_sx_level,
+   less_sleep_numeric_main = less_sleep_numeric_sx_level,                    
+   more_talkative_numeric_main = more_talkative_numeric_sx_level,
+   racing_thoughts_numeric_main = racing_thoughts_numeric_sx_level,
+   conc_difficulties_numeric_main = conc_difficulties_numeric_sx_level,     
+   more_energy_numeric_main = more_energy_numeric_sx_level,
+   more_active_numeric_main = more_active_numeric_sx_level,
+   more_social_numeric_main = more_social_numeric_sx_level,             
+   higher_libido_numeric_main = higher_libido_numeric_sx_level,
+   more_risky_beh_numeric_main = more_risky_beh_numeric_sx_level,
+   reckless_spending_numeric_main = reckless_spending_numeric_sx_level,
+   
+   binge_eating_with_loss_control,
+   binge_eating_with_loss_control_numeric
+    ) 
+```
+
+```{r assign variable depending on main or sens analysis} 
+# Age
+symptom_dat <- symptom_dat %>%
+  mutate(age =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ age_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ age_sens
+                     )
+         )
+
+# Highest education
+symptom_dat <- symptom_dat %>%
+  mutate(highest_education =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ highest_education_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ highest_education_sens
+                     )
+         )
+
+# BMI signup
+symptom_dat <- symptom_dat %>%
+  mutate(bmi_signup =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ bmi_signup_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ bmi_signup_sens
+                     )
+         )
+
+# BMI highest
+symptom_dat <- symptom_dat %>%
+  mutate(bmi_highest =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ bmi_highest_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ bmi_highest_sens
+                     )
+         )
+
+
+# BMI lowest
+symptom_dat <- symptom_dat %>%
+  mutate(bmi_lowest =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ bmi_lowest_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ bmi_lowest_sens
+                     )
+         )
+
+# more_hyperactivity
+symptom_dat <- symptom_dat %>%
+  mutate(more_hyperactivity =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ more_hyperactivity_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ more_hyperactivity_sens
+                     )
+         )
+
+# more_hyperactivity_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(more_hyperactivity_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ more_hyperactivity_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ more_hyperactivity_numeric_sens
+                     )
+         )
+
+# more_irritable
+symptom_dat <- symptom_dat %>%
+  mutate(more_irritability =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ more_irritability_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ more_irritability_sens
+                     )
+         )
+
+# more_irritable_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(more_irritability_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ more_irritability_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ more_irritability_numeric_sens
+                     )
+         )
+
+
+# more_self_confidence
+symptom_dat <- symptom_dat %>%
+  mutate(more_self_confidence =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ more_self_confidence_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ more_self_confidence_sens
+                     )
+         )
+
+# more_self_confidence_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(more_self_confidence_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ more_self_confidence_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ more_self_confidence_numeric_sens
+                     )
+         )
+
+# less_sleep
+symptom_dat <- symptom_dat %>%
+  mutate(less_sleep =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ less_sleep_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ less_sleep_sens
+                     )
+         )
+
+# less_sleep_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(less_sleep_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ less_sleep_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ less_sleep_numeric_sens
+                     )
+         )
+
+# more_talkative
+symptom_dat <- symptom_dat %>%
+  mutate(more_talkative =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ more_talkative_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ more_talkative_sens
+                     )
+         )
+
+# more_talkative_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(more_talkative_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ more_talkative_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ more_talkative_numeric_sens
+                     )
+         )
+
+# racing_thoughts
+symptom_dat <- symptom_dat %>%
+  mutate(racing_thoughts =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ racing_thoughts_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ racing_thoughts_sens
+                     )
+         )
+
+# racing_thoughts_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(racing_thoughts_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ racing_thoughts_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ racing_thoughts_numeric_sens
+                     )
+         )
+
+# conc_difficulties
+symptom_dat <- symptom_dat %>%
+  mutate(conc_difficulties =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ conc_difficulties_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ conc_difficulties_sens
+                     )
+         )
+
+# conc_difficulties_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(conc_difficulties_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ conc_difficulties_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ conc_difficulties_numeric_sens
+                     )
+         )
+
+#  more_energy
+symptom_dat <- symptom_dat %>%
+  mutate(more_energy =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~  more_energy_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~  more_energy_sens
+                     )
+         )
+
+#  more_energy_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(more_energy_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~  more_energy_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~  more_energy_numeric_sens
+                     )
+         )
+
+#  more_active
+symptom_dat <- symptom_dat %>%
+  mutate(more_active =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~  more_active_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~  more_active_sens
+                     )
+         )
+
+# more_active_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(more_active_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ more_active_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ more_active_numeric_sens
+                     )
+         )
+
+
+# more_social
+symptom_dat <- symptom_dat %>%
+  mutate(more_social =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~  more_social_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~  more_social_sens
+                     )
+         )
+
+# more_social_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(more_social_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ more_social_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ more_social_numeric_sens
+                     )
+         )
+
+# higher_libido
+symptom_dat <- symptom_dat %>%
+  mutate(higher_libido =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~  higher_libido_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~  higher_libido_sens
+                     )
+         )
+
+# higher_libido_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(higher_libido_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ higher_libido_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ higher_libido_numeric_sens
+                     )
+         )
+
+# more_risky_beh
+symptom_dat <- symptom_dat %>%
+  mutate(more_risky_beh =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~  more_risky_beh_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~  more_risky_beh_sens
+                     )
+         )
+
+# more_risky_beh_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(more_risky_beh_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ more_risky_beh_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ more_risky_beh_numeric_sens
+                     )
+         )
+
+# reckless_spending
+symptom_dat <- symptom_dat %>%
+  mutate(reckless_spending =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~  reckless_spending_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~  reckless_spending_sens
+                     )
+         )
+
+# reckless_spending_numeric
+symptom_dat <- symptom_dat %>%
+  mutate(reckless_spending_numeric =
+           case_when(binge_eating_with_loss_control == "BE loss control" |
+                     binge_eating_with_loss_control == "No BE" ~ reckless_spending_numeric_main,
+                     
+                     binge_eating_with_loss_control == "BE no loss control" ~ reckless_spending_numeric_sens
+                     )
+         )
+```
+
+```{r create AS levels or higher variable symptom dat}
+# Check response options
+symptom_dat %>%
+  freq(highest_education)
+
+# Create A levels or higher variable
+symptom_dat <- symptom_dat %>%
+  mutate(AS_Levels_higher =
+           case_when(highest_education == "None of the above"  |
+                       highest_education == "GCSEs/CSEs/O-levels or equivalent"  |
+                       highest_education == "NVQ/HND/HNC or equivalent"  ~ "No",
+                    
+                     highest_education == "A-levels/AS-levels or equivalent" |
+                       highest_education == "University" ~ "Yes"
+                    )
+         )
+
+# Check response options
+symptom_dat %>%
+  group_by(binge_eating_with_loss_control) %>%
+  freq(AS_Levels_higher)
+```
+
+```{r create BE datasets}
+BE_loss_control <- symptom_dat %>%
+   filter(binge_eating_with_loss_control == "BE loss control") %>%
+  select(
+   more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric,
+   sex_numeric,
+   age,
+   sex,
+    ethnicity,
+    bmi_signup,
+    bmi_lowest,
+    bmi_highest,
+   racially_minoritised
+  )
+
+
+no_BE <- symptom_dat %>%
+   filter(binge_eating_with_loss_control == "No BE") %>%
+  select(
+   more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric,
+   sex_numeric,
+   age,
+   sex,
+    ethnicity,
+    bmi_signup,
+    bmi_lowest,
+    bmi_highest,
+   racially_minoritised
+  )
+
+BE_no_loss_control <- symptom_dat %>%
+   filter(binge_eating_with_loss_control == "BE no loss control") %>%
+  select(
+   more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric,
+   sex_numeric,
+   age,
+   sex,
+    ethnicity,
+    bmi_signup,
+    bmi_lowest,
+    bmi_highest,
+   racially_minoritised
+  )
+```
+
+```{r recode factors to ensure symptom plot is generated correctly}
+symptom_dat <- symptom_dat %>%
+  mutate(more_hyperactivity = factor(more_hyperactivity,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_irritability = factor(more_irritability,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_self_confidence = factor(more_self_confidence,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(less_sleep = factor(less_sleep,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+symptom_dat <- symptom_dat %>%
+  mutate(racing_thoughts = factor(racing_thoughts,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+symptom_dat <- symptom_dat %>%
+  mutate(conc_difficulties = factor(conc_difficulties,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_energy = factor(more_energy,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_energy = factor(more_energy,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_active = factor(more_active,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_social = factor(more_social,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(higher_libido = factor(higher_libido,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(more_risky_beh = factor(more_risky_beh,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+symptom_dat <- symptom_dat %>%
+  mutate(reckless_spending = factor(reckless_spending,
+                       levels = c("No", # Largest category
+                                  "Yes"
+                                  )))
+
+```
+
+# Descriptives
+# ggplot theme
+Set up ggplot theme for the plots
+```{r ggplot theme}
+theme_personal <-  theme(
+    text = element_text(color = "black"),
+    axis.title = element_text(color = "black"),
+    axis.text = element_text(color = "black"),
+    axis.title.y = element_blank(), 
+    legend.background = element_blank(),
+    legend.box.background = element_blank(),
+    panel.background = element_blank(), 
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.x = element_line(
+      colour = "gray",
+      linetype = "dashed",
+      size = 0.2
+      ),
+    axis.ticks = element_blank()
+    )
+```
+
+# Colour-blind palette
+```{r Colour-blind friendly palette }
+cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+pallette_tom <- c(
+  "lightskyblue3",
+# "lightgoldenrod1", 
+  "lightpink4",
+  "firebrick3", 
+  "orange1"
+  )
+```
+
+# Transform data to long format - diagnosis data 
+```{r Transform to long format}
+symptom_dat_long <- symptom_dat %>%
+  select(
+    ID,
+    age,
+    sex,
+    racially_minoritised,
+    bmi_signup,
+    bmi_lowest,
+    bmi_highest,
+    binge_eating_with_loss_control,
+    more_hyperactivity,
+   more_irritability,
+   more_self_confidence,
+   less_sleep,                    
+   more_talkative,
+   racing_thoughts ,
+   conc_difficulties,     
+   more_energy,
+   more_active,
+   more_social,             
+   higher_libido,
+   more_risky_beh,
+   reckless_spending 
+    ) %>%
+  pivot_longer(
+    cols = c(
+      "more_hyperactivity",
+   "more_irritability",
+   "more_self_confidence",
+   "less_sleep",                    
+   "more_talkative",
+   "racing_thoughts",
+   "conc_difficulties",     
+   "more_energy",
+   "more_active",
+   "more_social",             
+   "higher_libido",
+   "more_risky_beh",
+   "reckless_spending"
+      ),
+    names_to = "Mania_symptom",
+    values_to = "Endorsement"
+    ) 
+symptom_dat_long 
+```
+
+```{r group by binge eating}
+symptom_dat_long %>%
+  group_by(binge_eating_with_loss_control) %>%
+  count(Mania_symptom,
+        Endorsement)
+```
+
+# Plot - response distribution for mania symptom variables in the sample
+Plotting percentage of each group reporting mania symptoms
+```{r Mania symptom endorsement by eating disorder diagnoses,  fig.height=10, fig.width=10}
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/mania_symptom_endorsement_symp.png",
+    width = 800,
+    height = 800))
+
+symptom_dat_long %>% 
+  mutate(
+    mania_symptom_label =
+      recode_factor(Mania_symptom,
+                    "more_hyperactivity" =  "More hyperactivity",
+   "more_irritability"= "More irritable",    
+   "more_self_confidence"= "More self-confidence",
+   "less_sleep"= "Less sleep",                  
+   "more_talkative"= "More talkative",
+   "racing_thoughts"= "Racing thoughts",
+   "conc_difficulties" = "Concentration difficulties",     
+   "more_energy"= "More energy",
+   "more_active"= "More active",
+   "more_social"= "More social",          
+   "higher_libido" = "Higher libido",
+   "more_risky_beh"= "More risky behaviour",
+   "reckless_spending" = "Reckless spending"
+     )
+  ) %>%
+  ggplot(
+    aes(
+      y = binge_eating_with_loss_control,
+      fill = Endorsement
+      )
+    ) +
+  geom_bar(
+    position = "fill"
+    ) +
+  theme_light() +
+  theme(
+    legend.position= "none",
+    axis.title.y = element_blank(),
+     axis.title.x = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.text.x = element_text(size = 12), # size of percentages on x axis
+    strip.text = element_text(size = 13) # size of text in each facet
+) +
+  scale_fill_manual(values=c(
+    "gray75", "darkorchid2",
+    "gray75", "darkorchid2"
+    )) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1)) +
+    facet_wrap(
+    facets = "mania_symptom_label",
+    nrow = 13) +
+  xlab("Percentage of mania symptom endorsement")
+
+dev.off()
+```
+
+# Categorical variables
+## Table: Endorsement rates
+```{r categorical variables}
+# BE loss control
+BE_loss_control %>%
+  select(sex,
+         ethnicity,
+        # highest_education,
+         racially_minoritised,
+        more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric
+         ) %>%
+  tbl_summary(missing_text = "Missing")
+
+# BE no loss of control
+BE_no_loss_control %>%
+  select(sex,
+         ethnicity,
+         #highest_education,
+         racially_minoritised,
+         more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric
+         ) %>%
+  tbl_summary(missing_text = "Missing")
+
+# No BE
+no_BE %>%
+  select(sex,
+         ethnicity,
+         racially_minoritised,
+         more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric
+         ) %>%
+  tbl_summary(missing_text = "Missing")
+```
+
+## Comparison of categorical variables
+### Dummy variables
+```{r list categorical dummy variables}
+descriptives.columns <- c(
+  "sex",
+  "ethnicity",
+  "racially_minoritised",
+  "more_hyperactivity",
+  "more_irritability",
+  "more_self_confidence",
+  "less_sleep",                
+  "more_talkative",
+  "racing_thoughts",
+  "conc_difficulties",
+  "more_energy",
+  "more_active",
+  "more_social",  
+  "higher_libido",
+  "more_risky_beh",
+  "reckless_spending",
+  "binge_eating_with_loss_control",
+  "highest_education"
+)
+
+descriptives.columns.dummy <- c(
+  "sex",
+  "ethnicity",
+  "racially_minoritised",
+  "more_hyperactivity",
+  "more_irritability",
+  "more_self_confidence",
+  "less_sleep",                
+  "more_talkative",
+  "racing_thoughts",
+  "conc_difficulties",
+  "more_energy",
+  "more_active",
+  "more_social",  
+  "higher_libido",
+  "more_risky_beh",
+  "reckless_spending",
+  "highest_education"
+)
+```
+
+Dummy coding for categorical variables
+```{r dummy coding categorical variables}
+# Create dataset
+descriptives_df <- symptom_dat %>%
+  select(descriptives.columns)
+
+# Dummy coding
+descriptives_dummy <- fastDummies::dummy_cols(descriptives_df,
+                                              select_columns = descriptives.columns.dummy
+                                              )
+# Check
+colnames(descriptives_dummy)
+```
+
+### Chi-squared tests
+#### Sex
+```{r chi-squared sex}
+sex <- table(descriptives_dummy$binge_eating_with_loss_control,
+             descriptives_dummy$sex_Female
+             )
+
+sex_chisq <- chisq.test(sex)
+
+# P value
+sex_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(sex,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Race
+```{r chi-squared race}
+race <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$racially_minoritised_Yes)
+             
+
+race_chisq <- chisq.test(race)
+
+# P value
+race_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(race,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+
+symptom_dat %>%
+  group_by(binge_eating_with_loss_control) %>%
+  freq(racially_minoritised)
+```
+#### Education
+```{r chi-squared education}
+edu <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$highest_education)
+             
+
+edu_chisq <- chisq.test(edu)
+
+# P value
+edu_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(edu,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More hyperactivity
+```{r chi-squared more hyperactivity}
+hyperactivity <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_hyperactivity_Yes)
+             
+
+hyperactivity_chisq <- chisq.test(hyperactivity)
+
+# P value
+hyperactivity_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(hyperactivity,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More irritability
+```{r chi-squared more irritability}
+irritability <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_irritability_Yes)
+             
+
+irritability_chisq <- chisq.test(irritability)
+
+# P value
+irritability_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(irritability,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More self confidence
+```{r chi-squared more self_confidence}
+self_confidence <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_self_confidence_Yes)
+             
+
+self_confidence_chisq <- chisq.test(self_confidence)
+
+# P value
+self_confidence_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(self_confidence,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Less sleep
+```{r chi-squared more less_sleep}
+less_sleep <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$less_sleep_Yes)
+             
+
+less_sleep_chisq <- chisq.test(less_sleep)
+
+# P value
+less_sleep_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(less_sleep,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More talkative
+```{r chi-squared more talkative}
+more_talkative <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_talkative_Yes)
+             
+
+more_talkative_chisq <- chisq.test(more_talkative)
+
+# P value
+more_talkative_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_talkative,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Racing thoughts
+```{r chi-squared racing_thoughts}
+racing_thoughts <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$racing_thoughts_Yes)
+             
+
+racing_thoughts_chisq <- chisq.test(racing_thoughts)
+
+# P value
+racing_thoughts_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(racing_thoughts,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Concentration difficulties
+```{r chi-squared conc_difficulties}
+conc_difficulties <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$conc_difficulties_Yes)
+             
+
+conc_difficulties_chisq <- chisq.test(conc_difficulties)
+
+# P value
+conc_difficulties_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(conc_difficulties,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+  
+#### More energy
+```{r chi-squared more_energy}
+more_energy <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_energy_Yes)
+             
+
+more_energy_chisq <- chisq.test(more_energy)
+
+# P value
+more_energy_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_energy,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More active
+```{r chi-squared more_active}
+more_active <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_active_Yes)
+             
+
+more_active_chisq <- chisq.test(more_active)
+
+# P value
+more_active_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_active,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More social
+```{r chi-squared more_social}
+more_social <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_social_Yes)
+             
+
+more_social_chisq <- chisq.test(more_social)
+
+# P value
+more_social_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_social,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Higher libido
+```{r chi-squared higher_libido}
+higher_libido <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$higher_libido_Yes)
+             
+
+higher_libido_chisq <- chisq.test(higher_libido)
+
+# P value
+higher_libido_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(higher_libido,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### More risky behaviour
+```{r chi-squared more_risky_beh}
+more_risky_beh <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$more_risky_beh_Yes)
+             
+
+more_risky_beh_chisq <- chisq.test(more_risky_beh)
+
+# P value
+more_risky_beh_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(more_risky_beh,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+#### Reckless spending
+```{r chi-squared reckless_spending}
+reckless_spending <- table(descriptives_dummy$binge_eating_with_loss_control,
+              descriptives_dummy$reckless_spending_Yes)
+             
+
+reckless_spending_chisq <- chisq.test(reckless_spending)
+
+# P value
+reckless_spending_chisq$p.value
+
+# If significant, perform pairwise chi square tests
+rcompanion::pairwiseNominalIndependence(reckless_spending,
+                                     compare = "row",
+                            fisher = FALSE,
+                            gtest  = FALSE,
+                            chisq  = TRUE,
+                            method = "fdr")
+```
+
+# Continious variables
+## Generate mode function
+```{r mode function}
+mode_func <- function(x, na.rm = FALSE) {
+  if(na.rm){
+    x = x[!is.na(x)]
+  }
+
+  ux <- unique(x)
+  return(ux[which.max(tabulate(match(x, ux)))])
+}
+```
+
+## Table: Comparison of continuous variables
+```{r table compare continuous variables}
+# Create table
+numeric_table <- symptom_dat %>% 
+  group_by(binge_eating_with_loss_control) %>%
+  summarise_at(vars(age,
+                    bmi_signup,
+                    bmi_lowest,
+                    bmi_highest),
+    .funs =
+      list(
+        ~mean(., na.rm = T),
+        ~sd(., na.rm = T),
+        mode = ~mode_func(., na.rm = T),
+        ~median(., na.rm = T),
+        ~min(., na.rm = T),
+        ~max(., na.rm = T),
+        missing = ~skimr::n_missing(.),
+        ~skew(., na.rm = T),
+        kurtosis = ~kurtosi(., na.rm = T)
+      )
+  )
+
+numeric_table
+```
+
+## Anovas (or non-parametric equivalent)
+#### Age: Testing normality: Histogram and qqplot
+```{r Check normality of age symptom sensitivity}
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/all_age_qqplot_symp_sens.png"))
+
+ggpubr::ggqqplot(symptom_dat,
+         "age",
+         facet.by = "binge_eating_with_loss_control")
+
+dev.off()
+
+# Histogram of age- BE_loss_control
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/BE_loss_control_age_histogram_symp_sens.png")) 
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "BE loss control") %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of age in BE loss control group") +
+  xlab("Age")
+
+dev.off()
+
+# Histogram of age- BE_loss_control
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/BE_no_loss_control_age_histogram_symp_sens.png"))
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "BE no loss control") %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of age in BE no loss control group") +
+  xlab("Age")
+
+dev.off()
+
+# Histogram of age - no_BE
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/no_BE_age_histogram_symp_sens.png"))
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "No BE") %>%
+  ggplot(mapping = aes(x = age)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of age in no BE group") +
+  xlab("Age")
+
+dev.off()
+```
+
+#### Age: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of age symptom sensitivity}
+car::leveneTest(age ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+```
+
+##### Age: Both assumptions violated; so performed the non-parametric equivalent of ANOVA: Kruskal-Wallis one-way ANOVA. 
+```{r Kruskal-Wallis rank sum test age symptom sensitivity}
+krus <- kruskal.test(age ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+krus$p.value
+```
+
+###### Age: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+Dunn's Kruskal-Wallis Multiple Comparisons.
+```{r Dunns Kruskal-Wallis Multiple Comparisons age symptom sensitivity}
+age_dunnTest <- FSA::dunnTest(age ~ binge_eating_with_loss_control,
+                data = symptom_dat,
+              method="bh"
+)
+
+print(age_dunnTest, dunn.test.results=TRUE)
+
+age_dunnTest$res
+```
+
+#### BMI signup: Testing normality: Histogram and qqplot
+```{r Check normality of BMI signup symptom sensitivity}
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/all_bmi_signup_qqplot_symp_sens.png")) 
+
+ggpubr::ggqqplot(symptom_dat,
+         "bmi_signup",
+         facet.by = "binge_eating_with_loss_control")
+
+dev.off()
+
+# Histogram of BMI signup- BE_loss_control
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/BE_loss_control_bmi_signup_histogram_symp_sens.png")) 
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "BE loss control") %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of BMI signup in BE loss control group") +
+  xlab("BMI signup")
+
+dev.off()
+
+# Histogram of BMI signup- BE_loss_control
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/BE_no_loss_control_bmi_signup_histogram_symp_sens.png")) 
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "BE no loss control") %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI signup in BE no loss control group") +
+  xlab("BMI signup")
+
+dev.off()
+
+# Histogram of BMI signup - no_BE
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/no_BE_bmi_signup_histogram_symp_sens.png")) 
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "No BE") %>%
+  ggplot(mapping = aes(x = bmi_signup)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI signup in no BE group") +
+  xlab("BMI signup")
+
+dev.off()
+```
+
+#### BMI signup: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of BMI signup symptom sensitivity}
+car::leveneTest(bmi_signup ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+```
+
+##### BMI signup: Both assumptions violated; so performed the non-parametric equivalent of ANOVA: Kruskal-Wallis one-way ANOVA. 
+```{r Kruskal-Wallis rank sum test BMI signup symptom sensitivity}
+krus <- kruskal.test(bmi_signup ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+krus$p.value
+```
+
+###### BMI signup: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+Dunn's Kruskal-Wallis Multiple Comparisons.
+```{r Dunns Kruskal-Wallis Multiple Comparisons BMI signup symptom sensitivity}
+bmi_signup_dunnTest <- FSA::dunnTest(bmi_signup ~ binge_eating_with_loss_control,
+                data = symptom_dat,
+              method="bh"
+)
+
+print(bmi_signup_dunnTest, dunn.test.results=TRUE)
+
+bmi_signup_dunnTest$res
+```
+
+#### BMI lowest: Testing normality: Histogram and qqplot
+```{r Check normality of BMI lowest symptom sensitivity}
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/all_bmi_lowest_qqplot_symp_sens.png")) 
+
+ggpubr::ggqqplot(symptom_dat,
+         "bmi_lowest",
+         facet.by = "binge_eating_with_loss_control")
+
+dev.off()
+
+# Histogram of BMI lowest- BE_loss_control
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/BE_loss_control_bmi_lowest_histogram_symp_sens.png")) 
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "BE loss control") %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of BMI lowest in BE loss control group") +
+  xlab("BMI lowest")
+
+dev.off()
+
+# Histogram of BMI lowest- BE_no_loss_control
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/BE_no_loss_control_bmi_lowest_histogram_symp_sens.png")) 
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "BE no loss control") %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI lowest in BE no loss control group") +
+  xlab("BMI lowest")
+
+dev.off()
+
+# Histogram of BMI lowest - no_BE
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/no_BE_bmi_lowest_histogram_symp_sens.png")) 
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "No BE") %>%
+  ggplot(mapping = aes(x = bmi_lowest)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI lowest in no BE group") +
+  xlab("BMI lowest")
+
+dev.off()
+```
+
+#### BMI lowest: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of BMI lowest symptom sensitivity}
+car::leveneTest(bmi_lowest ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+```
+
+##### BMI lowest: Both assumptions violated; so performed the non-parametric equivalent of ANOVA: Kruskal-Wallis one-way ANOVA. 
+```{r Kruskal-Wallis rank sum test BMI lowest symptom sensitivity}
+krus <- kruskal.test(bmi_lowest ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+krus$p.value
+```
+
+###### BMI lowest: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+Dunn's Kruskal-Wallis Multiple Comparisons.
+```{r Dunns Kruskal-Wallis Multiple Comparisons BMI lowest symptom sensitivity}
+bmi_lowest_dunnTest <- FSA::dunnTest(bmi_lowest ~ binge_eating_with_loss_control,
+                data = symptom_dat,
+              method="bh"
+)
+
+print(bmi_lowest_dunnTest, dunn.test.results=TRUE)
+
+bmi_lowest_dunnTest$res
+```
+
+#### BMI highest: Testing normality: Histogram and qqplot
+```{r Check normality of BMI highest symptom sensitivity}
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/all_bmi_highest_qqplot_symp_sens.png")) 
+
+ggpubr::ggqqplot(symptom_dat,
+         "bmi_highest",
+         facet.by = "binge_eating_with_loss_control")
+
+dev.off()
+
+# Histogram of BMI highest- BE_loss_control
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/BE_loss_control_bmi_highest_histogram_symp_sens.png"))  
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "BE loss control") %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  theme_minimal() +
+  ggtitle("Histogram of BMI highest in BE loss control group") +
+  xlab("BMI highest")
+
+dev.off()
+
+# Histogram of BMI highest- BE_no_loss_control
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/BE_no_loss_control_bmi_highest_histogram_symp_sens.png")) 
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "BE no loss control") %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI highest in BE no loss control group") +
+  xlab("BMI highest")
+
+dev.off()
+
+# Histogram of BMI highest - no_BE
+png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/no_BE_bmi_highest_histogram_symp_sens.png")) 
+
+symptom_dat %>%
+  filter(binge_eating_with_loss_control == "No BE") %>%
+  ggplot(mapping = aes(x = bmi_highest)) +
+  geom_histogram() +
+  theme_minimal()  +
+  ggtitle("Histogram of BMI highest in no BE group") +
+  xlab("BMI highest")
+
+dev.off()
+```
+
+#### BMI highest: Testing homoscedasticity: Levene’s test
+Significant p-value: obtained differences in sample variances are unlikely to have occurred based on random sampling from a population with equal variances (heteroscedasticity occurs when values of the dependent variable seem to increase or decrease as a function of the independent variables. Typically, homoscedasticity violations occur when one or more of the variables under investigation are not normally distributed.) i.e., if significant, then violation of assumption.
+```{r check homoscedasticity of BMI highest symptom sensitivity}
+car::leveneTest(bmi_highest ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+```
+
+##### BMI highest: Both assumptions violated; so performed the non-parametric equivalent of ANOVA: Kruskal-Wallis one-way ANOVA. 
+```{r Kruskal-Wallis rank sum test BMI highest symptom sensitivity}
+krus <- kruskal.test(bmi_highest ~ binge_eating_with_loss_control,
+                data = symptom_dat) 
+krus$p.value
+```
+
+###### BMI highest: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+Dunn's Kruskal-Wallis Multiple Comparisons.
+```{r Dunns Kruskal-Wallis Multiple Comparisons BMI highest symptom sensitivity}
+bmi_highest_dunnTest <- FSA::dunnTest(bmi_highest ~ binge_eating_with_loss_control,
+                data = symptom_dat,
+              method="bh"
+)
+
+print(bmi_highest_dunnTest, dunn.test.results=TRUE)
+
+bmi_highest_dunnTest$res
+```
