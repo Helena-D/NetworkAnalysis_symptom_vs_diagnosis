@@ -1,2 +1,2 @@
 # NetworkAnalysis_symptom_vs_diagnosis
-Git repository for all code related to the project 'Binge eating is a key factor in the comorbidity of mania and eating disorders: a network analysis'.
+Git repository for all code related to the project 'The network structure of mania symptoms differs between people with and without binge eating'.
