@@ -62,6 +62,7 @@ colnames(dat)
 dat %>%
   nrow()
 ```
+
 # Check where participants are from before exclusion criteria applied - detailed
 ```{r check NBR cohort information}
 cohort_info_detailed <- read_csv(paste0(filepath_PhD, "/COPING_cohorts_28.03.2022_hash.csv"))
@@ -75,18 +76,32 @@ cohort_info_detailed %>%
   freq(cohort_detailed)
 
 dat <- dplyr::full_join(dat,
-                        cohort_info_detailed)
+                        cohort_info_detailed,
+                        by ="ID")
 
 
 dat %>%
   filter(sample =="NBR") %>%
   freq(cohort_detailed)
 
+# Check if they have info
 dat %>%
   filter(sample =="NBR" &
-        is.na(cohort_detailed)) %>%
+           is.na(cohort_detailed)) %>%
+  freq(gender_cop)
+
+
+dat %>%
+  filter(sample =="NBR" &
+        is.na(cohort_detailed) &
+          
+         (!is.na(dem.dob_age_cop) |
+         !is.na(sex_cop) |
+           !is.na(mhd.mdd_numeric)) 
+         ) %>%
   pull(ID) %>%
-  write.table(paste0(filepath_misc, "NBR_IDs_no_cohort_info.csv"))
+  write.table(paste0(filepath_misc, "NBR_IDs_no_cohort_info_NEW_11072022.csv"),
+              row.names = F )
 ```
 
 ```{r cohort info less detail}
@@ -101,7 +116,8 @@ cohort_info %>%
   freq(cohort)
 
 dat <- dplyr::full_join(dat,
-                        cohort_info)
+                        cohort_info,
+                        by ="ID")
 
 
 dat %>%
@@ -124,12 +140,34 @@ diagnosis_dat %>%
   dim()
 
 # Symptom data
+## First, exclude NBR participants with missing cohort information or age or sex (i.e., did not answer questionnaires)
+dat <- dat %>%
+  filter(
+          (sample == "GLAD" |
+           sample == "EDGI") |
+           
+           (
+             (sample == "NBR" &
+              !is.na(cohort)) |
+           
+           ((sample == "NBR" &
+              is.na(cohort)) &
+              !is.na(age_sx_level))
+         )
+  )
+# Check 
+dat %>%
+  dim()
+
 symptom_dat <- dat %>%
   filter(!is.na(binge_eating_with_loss_control))
 
 # Check 
 symptom_dat %>%
   dim()
+
+# Missing for BE
+70648-40228
 ```
 
 # Exclusions for missingness 
@@ -192,7 +230,7 @@ symptom_dat_excl_sex <- symptom_dat %>%
   drop_na(sex_final)
 nrow(symptom_dat_excl_sex)-nrow(symptom_dat)
 ```
-725 participants did not report their biological sex
+678 participants did not report their biological sex
 
 ## Age
 Exclude participants with missing age
@@ -209,7 +247,7 @@ nrow(symptom_dat)-nrow(symptom_dat_excl_sex_age) # total
 symptom_dat_excl_sex_age <- symptom_dat_excl_sex_age %>%
   drop_na(age_sx_level_sens)
 ```
-A further 2079 participants did not report their age
+691 participants did not report their age
 
 ## MDQ
 Exclude participants that had missing MDQ values
@@ -250,7 +288,7 @@ nrow(symptom_dat_excl_sex_age_mdq)-nrow(symptom_dat_excl_sex)
 
 nrow(symptom_dat)-nrow(symptom_dat_excl_sex_age_mdq) # total
 ```
-An additional 6464 individuals excluded because they are missing an item on the MDQ.
+5076 individuals excluded because they are missing an item on the MDQ.
 
 ### Tidy tibble for analysis
 ```{r Tidy tibble for analysis symptom data}
@@ -260,6 +298,10 @@ symptom_dat_analysis <- symptom_dat_excl_sex_age_mdq
 # Check number of participants and sample origin after exclusion criteria applied
 ```{r check Ns after exclusion criteria applied}
 # Overall
+symptom_dat_main_analysis <-  symptom_dat_analysis %>%
+  filter(binge_eating_with_loss_control == "BE loss control" |
+             binge_eating_with_loss_control == "No BE") 
+
 symptom_dat_analysis %>%
   filter(binge_eating_with_loss_control == "BE loss control" |
              binge_eating_with_loss_control == "No BE") %>%
@@ -293,7 +335,7 @@ saveRDS(symptom_dat_analysis,
 
 # Export excluded data
 dat %>%
-  filter(ID %!in% symptom_dat_analysis$ID) %>%
+  filter(ID %!in% symptom_dat_main_analysis$ID) %>%
 saveRDS(file = paste0("../data/excluded_dat_analysis",
                 date,
                 ".rds"

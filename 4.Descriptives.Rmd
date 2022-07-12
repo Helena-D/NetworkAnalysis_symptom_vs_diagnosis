@@ -127,7 +127,7 @@ symptom_dat <- symptom_dat %>%
 # Only want to compare BE loss of control with no BE (set BE no loss of control to NA)
 symptom_dat <- symptom_dat %>%
   mutate(binge_eating_with_loss_control =
-    case_when(binge_eating_with_loss_control == "BE loss control" ~ "BE loss control",
+    case_when(binge_eating_with_loss_control == "BE loss control" ~ "BE",
          binge_eating_with_loss_control == "No BE" ~ "No BE",
          TRUE ~ NA_character_
           )
@@ -141,6 +141,7 @@ symptom_dat %>%
   freq(sample)
 # Check which cohort
 symptom_dat %>%
+  filter(sample == "NBR") %>%
   freq(cohort)
 ```
 
@@ -206,7 +207,7 @@ symptom_dat %>%
 
 ```{r create BE datasets symptom}
 BE_loss_control <- symptom_dat %>%
-   filter(binge_eating_with_loss_control == "BE loss control") %>%
+   filter(binge_eating_with_loss_control == "BE") %>%
   select(
    more_hyperactivity_numeric,
    more_irritability_numeric,
@@ -439,18 +440,19 @@ symptom_dat_long %>%
 # Plot - response distribution for mania symptom variables in the sample
 Plotting percentage of each group reporting mania symptoms
 ```{r Mania symptom endorsement by binge eating,  fig.height=10, fig.width=10}
-png(file = paste0(filepath_plots, "/symptom/descriptives/symptom/descriptives/mania_symptom_endorsement_symp.png",
-    width = 800,
-    height = 800
+png(width = 800,
+    height = 800,
+    file = paste0(
+    filepath_plots, "/symptom/descriptives/mania_symptom_endorsement_symp.png"
+   
     ))
-
 
 symptom_dat_long %>% 
   mutate(
     mania_symptom_label =
       recode_factor(Mania_symptom,
-                    "more_hyperactivity" =  "More hyperactivity",
-   "more_irritability"= "More irritable",    
+                    "more_hyperactivity" =  "Hyperactivity",
+   "more_irritability"= "Irritablity",    
    "more_self_confidence"= "More self-confidence",
    "less_sleep"= "Less sleep",                  
    "more_talkative"= "More talkative",
@@ -460,7 +462,7 @@ symptom_dat_long %>%
    "more_active"= "More active",
    "more_social"= "More social",          
    "higher_libido" = "Higher libido",
-   "more_risky_beh"= "More risky behaviour",
+   "more_risky_beh"= "Unusual and/or risky behaviour",
    "reckless_spending" = "Reckless spending"
      )
   ) %>%
@@ -468,7 +470,6 @@ symptom_dat_long %>%
     aes(
       y = binge_eating_with_loss_control,
       fill = Endorsement, 
-      x = 
       )
     ) +
   geom_bar(
@@ -478,10 +479,11 @@ symptom_dat_long %>%
   theme(
     legend.position= "none",
     axis.title.y = element_blank(),
-     axis.title.x = element_text(size = 14),
-    axis.text = element_text(size = 12),
+    axis.title.x = element_text(size = 14),
+    axis.text = element_text(size = 12), # size of labels on y axis
     axis.text.x = element_text(size = 12), # size of percentages on x axis
-    strip.text = element_text(size = 13) # size of text in each facet
+    strip.text = element_text(size = 14, colour = "black"), # size of text in each facet
+    strip.background = element_rect(fill = "white", colour ="gray75"),
 ) +
   scale_fill_manual(values=c(
     "gray75", "darkorchid2",
@@ -606,325 +608,165 @@ colnames(descriptives_dummy)
 ### Chi-squared tests
 #### Sex
 ```{r chi-squared sex symptom}
-sex <- table(descriptives_dummy$binge_eating_with_loss_control,
-             descriptives_dummy$sex_Female
-             
-             )
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$sex_Female ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-sex_chisq <- chisq.test(sex)
-
-# P value
-sex_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(sex,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### Race
 ```{r chi-squared race symptom}
-race <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$racially_minoritised_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$racially_minoritised_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-race_chisq <- chisq.test(race)
-
-# P value
-race_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(race,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### Education
 ```{r chi-squared education symptom}
-edu <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$AS_Levels_higher_Yes)
-  
-edu_chisq <- chisq.test(edu)
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$AS_Levels_higher_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-# P value
-edu_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(edu,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### More hyperactivity
 ```{r chi-squared more hyperactivity symptom}
-hyperactivity <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$more_hyperactivity_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$more_hyperactivity_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-hyperactivity_chisq <- chisq.test(hyperactivity)
-
-# P value
-hyperactivity_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(hyperactivity,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### More irritability
 ```{r chi-squared more irritability}
-irritability <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$more_irritability_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$more_irritability_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-irritability_chisq <- chisq.test(irritability)
-
-# P value
-p <- irritability_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(irritability,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### More self confidence
 ```{r chi-squared more self_confidence symptom}
-self_confidence <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$more_self_confidence_Yes)
-             
+test <-RVAideMemoire::chisq.bintest(descriptives_dummy$more_self_confidence_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-self_confidence_chisq <- chisq.test(self_confidence)
-
-# P value
-self_confidence_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(self_confidence,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### Less sleep
 ```{r chi-squared more less_sleep symptom}
-less_sleep <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$less_sleep_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$less_sleep_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-less_sleep_chisq <- chisq.test(less_sleep)
-
-# P value
-less_sleep_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(less_sleep,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### More talkative
 ```{r chi-squared more talkative symptom}
-more_talkative <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$more_talkative_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$more_talkative_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-more_talkative_chisq <- chisq.test(more_talkative)
-
-# P value
-more_talkative_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(more_talkative,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### Racing thoughts
 ```{r chi-squared racing_thoughts symptom}
-racing_thoughts <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$racing_thoughts_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$racing_thoughts_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-racing_thoughts_chisq <- chisq.test(racing_thoughts)
-
-# P value
-racing_thoughts_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(racing_thoughts,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### Concentration difficulties
 ```{r chi-squared conc_difficulties symptom}
-conc_difficulties <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$conc_difficulties_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$conc_difficulties_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-conc_difficulties_chisq <- chisq.test(conc_difficulties)
-
-# P value
-conc_difficulties_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(conc_difficulties,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
   
 #### More energy
 ```{r chi-squared more_energy symptom}
-more_energy <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$more_energy_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$more_energy_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-more_energy_chisq <- chisq.test(more_energy)
-
-# P value
-more_energy_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(more_energy,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### More active
 ```{r chi-squared more_active symptom}
-more_active <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$more_active_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$more_active_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-more_active_chisq <- chisq.test(more_active)
-
-# P value
-more_active_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(more_active,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### More social
 ```{r chi-squared more_social symptom}
-more_social <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$more_social_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$more_social_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-more_social_chisq <- chisq.test(more_social)
-
-# P value
-more_social_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(more_social,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### Higher libido
 ```{r chi-squared higher_libido symptom}
-higher_libido <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$higher_libido_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$higher_libido_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-higher_libido_chisq <- chisq.test(higher_libido)
-
-# P value
-higher_libido_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(higher_libido,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### More risky behaviour
 ```{r chi-squared more_risky_beh symptom}
-more_risky_beh <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$more_risky_beh_Yes)
-             
+test <-RVAideMemoire::chisq.bintest(descriptives_dummy$more_risky_beh_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-more_risky_beh_chisq <- chisq.test(more_risky_beh)
-
-# P value
-more_risky_beh_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(more_risky_beh,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
 #### Reckless spending
 ```{r chi-squared reckless_spending symptom}
-reckless_spending <- table(descriptives_dummy$binge_eating_with_loss_control,
-              descriptives_dummy$reckless_spending_Yes)
-             
+test <- RVAideMemoire::chisq.bintest(descriptives_dummy$reckless_spending_Yes ~ descriptives_dummy$binge_eating_with_loss_control ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-reckless_spending_chisq <- chisq.test(reckless_spending)
-
-# P value
-more_risky_beh_chisq$p.value
-
-# If significant, perform pairwise chi square tests
-rcompanion::pairwiseNominalIndependence(reckless_spending,
-                                     compare = "row",
-                            fisher = FALSE,
-                            gtest  = FALSE,
-                            chisq  = TRUE,
-                            method = "fdr")
+test$p.value
 ```
 
-# Continious variables
+# Continuous variables
 ## Generate mode function
 ```{r mode function symptom}
 mode_func <- function(x, na.rm = FALSE) {
@@ -948,16 +790,16 @@ numeric_table <- symptom_dat %>%
                     bmi_highest),
     .funs =
       list(
-        ~mean(., na.rm = T),
-        ~sd(., na.rm = T),
+      #  ~mean(., na.rm = T),
+      #  ~sd(., na.rm = T),
         ~IQR(., na.rm=T),
-        mode = ~mode_func(., na.rm = T),
-        ~median(., na.rm = T),
-        ~min(., na.rm = T),
-        ~max(., na.rm = T),
-        missing = ~skimr::n_missing(.),
-        ~skew(., na.rm = T),
-        kurtosis = ~kurtosi(., na.rm = T)
+      #  mode = ~mode_func(., na.rm = T),
+        ~median(., na.rm = T)
+      #  ~min(., na.rm = T),
+      #  ~max(., na.rm = T),
+      #  missing = ~skimr::n_missing(.),
+     #   ~skew(., na.rm = T),
+     #   kurtosis = ~kurtosi(., na.rm = T)
       )
   )
 
@@ -967,7 +809,7 @@ numeric_table
 ## T-tests (or non-parametric equivalent): SYMPTOM DATA
 ```{r create test groups to assess parametric assumptions symptom}
 BE <- symptom_dat %>%
-  filter(binge_eating_with_loss_control == "BE loss control")
+  filter(binge_eating_with_loss_control == "BE")
 
 no_BE <- symptom_dat %>%
   filter(binge_eating_with_loss_control == "No BE")
@@ -1111,7 +953,7 @@ car::leveneTest(age ~ binge_eating_with_loss_control,
 ```{r independent 2-group Mann-Whitney U test age symptom}
 age_wilcox <- wilcox.test(symptom_dat$age ~symptom_dat$binge_eating_with_loss_control,
             correct = FALSE,
-            exact = FALSE)
+            p.adjust.methods="fdr")
 
 
 print(age_wilcox$p.value)
@@ -1238,8 +1080,7 @@ car::leveneTest(bmi_signup ~ binge_eating_with_loss_control,
 ##### BMI signup: Both assumptions violated; so performed the non-parametric equivalent of t-test: Mann-Whitney
 ```{r independent 2-group Mann-Whitney U test bmi_signup symptom}
 bmi_signup_wilcox <- wilcox.test(symptom_dat$bmi_signup ~ symptom_dat$binge_eating_with_loss_control,
-            correct = FALSE,
-            exact = FALSE)
+            p.adjust.methods ="fdr")
 
 
 print(bmi_signup_wilcox)
@@ -1366,11 +1207,11 @@ car::leveneTest(bmi_lowest ~ binge_eating_with_loss_control,
 ##### BMI lowest: Both assumptions violated; so performed the non-parametric equivalent of t-test: Mann-Whitney
 ```{r independent 2-group Mann-Whitney U test bmi_lowest symptom}
 bmi_lowest_wilcox <- wilcox.test(symptom_dat$bmi_lowest ~ symptom_dat$binge_eating_with_loss_control,
-            correct = FALSE,
-            exact = FALSE)
+           correct = FALSE,
+                                  p.adjust.methods ="fdr")
 
 
-print(bmi_lowest_wilcox)
+print(bmi_lowest_wilcox$p.value)
 ```
 
 ### BMI highest
@@ -1495,10 +1336,11 @@ car::leveneTest(bmi_highest ~ binge_eating_with_loss_control,
 ```{r independent 2-group Mann-Whitney U test bmi_highest symptom}
 bmi_highest_wilcox <- wilcox.test(symptom_dat$bmi_highest ~ symptom_dat$binge_eating_with_loss_control,
             correct = FALSE,
-            exact = FALSE)
+            exact = TRUE,
+            p.adjust.method = "fdr")
 
 
-print(bmi_highest_wilcox)
+print(bmi_highest_wilcox$p.value)
 ```
 
 # Read in merged data with variables created: DIAGNOSIS DATA
@@ -1825,16 +1667,17 @@ diagnosis_dat_long %>%
 # Plot - response distribution for mania diagnosis variables in the sample
 Plotting percentage of each group reporting mania diagnosiss
 ```{r Mania diagnosis endorsement by eating disorder diagnoses,  fig.height=10, fig.width=10}
-png(file = paste0(filepath_plots, "/diagnosis/descriptives/mania_symptom_endorsement_diag.png",
-    width = 800,
-    height = 800))
+png(width = 800,
+    height = 800,
+    file = paste0(filepath_plots, "/diagnosis/descriptives/mania_symptom_endorsement_diag.png"
+    ))
 
 diagnosis_dat_long %>% 
   mutate(
     mania_diagnosis_label =
       recode_factor(Mania_diagnosis,
-                    "more_hyperactivity" =  "More hyperactivity",
-   "more_irritability"= "More irritable",    
+                    "more_hyperactivity" =  "Hyperactivity",
+   "more_irritability"= "Irritablity",    
    "more_self_confidence"= "More self-confidence",
    "less_sleep"= "Less sleep",                  
    "more_talkative"= "More talkative",
@@ -1844,7 +1687,7 @@ diagnosis_dat_long %>%
    "more_active"= "More active",
    "more_social"= "More social",          
    "higher_libido" = "Higher libido",
-   "more_risky_beh"= "More risky behaviour",
+   "more_risky_beh"= "Unusual and/or risky behaviour",
    "reckless_spending" = "Reckless spending"
      )
   ) %>%
@@ -1864,7 +1707,8 @@ diagnosis_dat_long %>%
     axis.title.x = element_text(size = 14),
     axis.text = element_text(size = 12),
     axis.text.x = element_text(size = 12), # size of percentages on x axis
-    strip.text = element_text(size = 13) # size of text in each facet
+    strip.text = element_text(size = 14, colour = "black"), # size of text in each facet
+    strip.background = element_rect(fill = "white", colour ="gray75"),
     ) +
   scale_fill_manual(values=c(
     "gray75", "darkorchid2",
@@ -2310,7 +2154,7 @@ rcompanion::pairwiseNominalIndependence(reckless_spending,
                             method = "fdr")
 ```
 
-# Continious variables
+# Continuous variables
 ## Generate mode function
 ```{r mode function diagnosis}
 mode_func <- function(x, na.rm = FALSE) {
@@ -2498,7 +2342,7 @@ krus <- kruskal.test(age ~ ED_hierarchical,
 krus$p.value
 ```
 
-###### Age: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+###### Age: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance (same as FDR). 
 Dunn's Kruskal-Wallis Multiple Comparisons.
 ```{r Dunns Kruskal-Wallis Multiple Comparisons age diagnosis}
 age_dunnTest <- FSA::dunnTest(age ~ ED_hierarchical,
@@ -2506,9 +2350,11 @@ age_dunnTest <- FSA::dunnTest(age ~ ED_hierarchical,
               method="bh"
 )
 
-print(age_dunnTest, dunn.test.results=TRUE)
+print(age_dunnTest,
+      dunn.test.results=TRUE)
 
 age_dunnTest$res
+
 ```
 
 #### BMI signup: Testing normality: Histogram and qqplot
@@ -2654,7 +2500,7 @@ krus <- kruskal.test(bmi_signup ~ ED_hierarchical,
 krus$p.value
 ```
 
-###### BMI signup: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+###### BMI signup: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance (same as FDR). 
 Dunn's Kruskal-Wallis Multiple Comparisons.
 ```{r Dunns Kruskal-Wallis Multiple Comparisons BMI signup diagnosis}
 bmi_signup_dunnTest <- FSA::dunnTest(bmi_signup ~ ED_hierarchical,
@@ -2810,7 +2656,7 @@ krus <- kruskal.test(bmi_lowest ~ ED_hierarchical,
 krus$p.value
 ```
 
-###### BMI lowest: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+###### BMI lowest: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance (same as FDR). . 
 Dunn's Kruskal-Wallis Multiple Comparisons.
 ```{r Dunns Kruskal-Wallis Multiple Comparisons BMI lowest diagnosis}
 bmi_lowest_dunnTest <- FSA::dunnTest(bmi_lowest ~ ED_hierarchical,
@@ -2966,7 +2812,7 @@ krus <- kruskal.test(bmi_highest ~ ED_hierarchical,
 krus$p.value
 ```
 
-###### BMI highest: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance. 
+###### BMI highest: kruskal-wallis test was significant, so Dunn’s post-hoc tests were carried out with Benjamini-Hochberg levels of significance (same as FDR). . 
 Dunn's Kruskal-Wallis Multiple Comparisons.
 ```{r Dunns Kruskal-Wallis Multiple Comparisons BMI highest diagnosis}
 bmi_highest_dunnTest <- FSA::dunnTest(bmi_highest ~ ED_hierarchical,

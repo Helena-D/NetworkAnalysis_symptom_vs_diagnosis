@@ -452,7 +452,163 @@ dat %>%
   freq(racially_minoritised)
 ```
 
-# Select relevant variables (for variables that can change)
+# Select relevant variables (for variables that can change) hal here
+```{r}
+dat_diagnostic_crossover <- dat %>%
+ filter(
+        (
+          (ed.DSM5_BED_binary_numeric == 1 |
+          an.1.bingeeating_disorder == 1 |
+          mhd.bed_numeric == 1) & # Has BED in GLAD or EDGI UK (sign-up)
+          
+          ((ed.DSM5_AN_binge_purge_binary_numeric == 0 |
+          is.na(ed.DSM5_AN_binge_purge_binary_numeric)) &
+            (ed.DSM5_BN_binary_numeric == 0 |
+          is.na(ed.DSM5_BN_binary_numeric)) &
+            (an.1.anorexia_nervosa_binge_purge == "Not Anorexia binge-eating/purging" |
+          is.na(an.1.anorexia_nervosa_binge_purge)) &
+            (an.1.bulimia_nervosa_numeric == 0 |
+          is.na(an.1.bulimia_nervosa_numeric)) &
+            (mhd.bn_numeric == 0 |
+          is.na(mhd.bn_numeric)))) & # Does not have BN or ANBP in GLAD or EDGI UK (sign-up)
+   
+         (ed.DSM5_AN_binge_purge_binary_numeric_cop == 1 |
+           ed.DSM5_BN_binary_numeric_cop == 1 |
+           mhd.bn_cop_numeric == 1)) # Has BN or ANBP in COPING
+    
+
+dat_diagnostic_crossover2 <- dat %>%
+ filter(
+        (((ed.DSM5_BED_binary_numeric == 1 |
+          an.1.bingeeating_disorder == 1 |
+          mhd.bed_numeric == 1) | 
+           
+          (ed.DSM5_BN_binary_numeric == 1 |
+          an.1.bulimia_nervosa_numeric == 1 |
+           mhd.bn_numeric == 1)) & # Has BED or BN in GLAD or EDGI UK (sign-up)
+           
+         ((ed.DSM5_AN_binge_purge_binary_numeric == 0 |
+          is.na(ed.DSM5_AN_binge_purge_binary_numeric)) &
+            (an.1.anorexia_nervosa_binge_purge == "Not Anorexia binge-eating/purging" |
+          is.na(an.1.anorexia_nervosa_binge_purge)))) & # Does not have ANBP in GLAD or EDGI UK (sign-up)
+   
+         ed.DSM5_AN_binge_purge_binary_numeric_cop == 1 
+        ) # Has ANBP in COPING
+    
+dat_diag_cross_check <- dat %>%
+  filter(ID %in% dat_diagnostic_crossover$ID |
+         ID %in% dat_diagnostic_crossover2$ID)
+
+dat_diag_cross_check <- dat_diag_cross_check %>%
+  mutate(BED_in_GLAD_EDGI =
+           case_when(
+              ed.DSM5_BED_binary_numeric == 1 |
+          an.1.bingeeating_disorder == 1 |
+          mhd.bed_numeric == 1~ 1))
+
+dat_diag_cross_check <- dat_diag_cross_check %>%
+  mutate(BED_in_COPING =
+           case_when(
+              ed.DSM5_BED_binary_numeric_cop == 1 |
+          mhd.bed_cop_numeric == 1~ 1))
+
+dat_diag_cross_check <- dat_diag_cross_check %>%
+  mutate(BN_in_GLAD_EDGI =
+           case_when(
+              ed.DSM5_BN_binary_numeric == 1 |
+                an.1.bulimia_nervosa_numeric == 1 |
+                mhd.bn_numeric == 1 ~ 1))
+
+dat_diag_cross_check <- dat_diag_cross_check %>%
+  mutate(BN_in_COPING =
+           case_when(
+             ed.DSM5_BN_binary_numeric_cop == 1 |
+           mhd.bn_cop_numeric == 1  ~ 1))
+
+dat_diag_cross_check <- dat_diag_cross_check %>%
+  mutate(ANBP_in_GLAD_EDGI =
+           case_when(
+              ed.DSM5_AN_binge_purge_binary_numeric == 1 |
+               an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging"  ~ 1))
+
+dat_diag_cross_check <- dat_diag_cross_check %>%
+  mutate(ANBP_in_COPING =
+           case_when(
+              ed.DSM5_AN_binge_purge_binary_numeric_cop == 1 ~ 1))
+
+
+dat_diag_cross_check %>%
+  select(BED_in_GLAD_EDGI,
+         BED_in_COPING,
+         BN_in_GLAD_EDGI,
+         BN_in_COPING,
+         ANBP_in_GLAD_EDGI,
+         ANBP_in_COPING)
+
+
+# Check number of people in final file
+symptom_dat <- readRDS(file = "../data/symptom_dat_analysis2022-03-15.rds")
+
+dat_diag_cross_check <- dat_diag_cross_check %>%
+  filter(ID %in% symptom_dat$ID)
+
+# How many of these people are in the ANBP group?
+dat_diag_cross_check_ANBP <- dat_diag_cross_check %>%
+  filter(ed.DSM5_AN_binge_purge_binary_numeric_cop == 1 |
+           ed.DSM5_AN_binge_purge_binary_numeric == 1 |
+           an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging") # 82 people with ANBP
+
+# How many of these people are in the BN group?
+dat_diag_cross_check %>%
+  filter(ID %!in% dat_diag_cross_check_ANBP$ID &
+          (ed.DSM5_BN_binary_numeric == 1 |
+           an.1.bulimia_nervosa_numeric == 1 |
+           mhd.bn_numeric == 1 |
+           mhd.bn_cop_numeric == 1 |
+           ed.DSM5_BN_binary_numeric_cop == 1)) # 284 people with BN
+
+# Check their values
+dat_diag_cross_check_table <- dat_diag_cross_check %>%
+  select(dem.bmi_signup_cop,
+         dem.bmi_signup,
+         dem.dob_age,
+         dem.dob_age_cop,
+         dem.age_category_cop,
+         selfreported_age,
+         mdq.hyper_normal_people_thought.1_numeric,
+         mdq.hyper_normal_people_thought.1_cop_numeric,
+         mdq.start_fights_shouted_arguments.1_numeric,
+         mdq.start_fights_shouted_arguments.1_cop_numeric,
+         mdq.usual_felt_selfconfident.1_numeric,
+         mdq.usual_felt_selfconfident.1_cop_numeric,
+         mdq.miss_found_sleep_usual.1_numeric,
+         mdq.miss_found_sleep_usual.1_cop_numeric,
+         mdq.faster_spoke_talkative_usual.1_numeric,
+         mdq.faster_spoke_talkative_usual.1_cop_numeric,
+         mdq.head_mind_couldnt_slow.1_numeric,
+         mdq.head_mind_couldnt_slow.1_cop_numeric,
+         mdq.staying_track_trouble_concentrating.1_numeric,
+         mdq.staying_track_trouble_concentrating.1_cop_numeric,
+         mdq.you_had_much_more_energy_than_usual.1_numeric,
+         mdq.you_had_much_more_energy_than_usual.1_cop_numeric,
+         mdq.active_usual_things.1_numeric,
+         mdq.active_usual_things.1_cop_numeric,
+         mdq.outgoing_middle_night_usual.1_numeric,
+         mdq.outgoing_middle_night_usual.1_cop_numeric,
+         mdq.interested_sex_usual.1_numeric,
+         mdq.interested_sex_usual.1_cop_numeric,
+         mdq.excessive_foolish_risky_unusual.1_numeric,
+         mdq.excessive_foolish_risky_unusual.1_cop_numeric,
+         mdq.trouble_family_spending_money.1_numeric,
+         mdq.trouble_family_spending_money.1_cop_numeric)
+
+```
+
+
+
+
+
+
 ## First, depending on diagnosis
 NB: We will lose people who took part in EDGI or GLAD sign-up but did not meet criteria for one of the EDs specified and then also did not take part in COPING. However, this is fine because we are comparing across ANBP, BED, and BN (and therefore people who do not fit one of these diagnoses would be dropped anyway). The 'TRUE' is assigning EVERYONE else their variable at COPING, however we will only end up keeping the participants who also then met diagnostic criteria in COPING for one of these disorders.
 
@@ -534,8 +690,7 @@ dat <- dat %>%
              binge_eating_disorder_timing == "BE disorder at sign-up" & 
                is.na(dem.bmi_lowest) &
                !is.na(an.bmi_lowest_cop) ~ an.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data (missing second most desirable)
-             
-              binge_eating_disorder_timing == "BE disorder at sign-up" & 
+               binge_eating_disorder_timing == "BE disorder at sign-up" & 
                is.na(an.bmi_lowest_cop) &
                !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
              

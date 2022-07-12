@@ -56,7 +56,7 @@ symptom_dat <- readRDS(file = paste0("../data/symptom_dat_analysis2022-03-15.rds
 dim(symptom_dat) 
 colnames(symptom_dat)
 
-excluded_dat <- readRDS(file = paste0("../data/excluded_dat_analysis2022-04-04.rds"))
+excluded_dat <- readRDS(file = paste0("../data/excluded_dat_analysis2022-07-08.rds"))
 dim(excluded_dat) 
 colnames(excluded_dat)
 
@@ -268,6 +268,8 @@ dat %>%
 dat %>%
   filter(is.na(highest_education)) %>%
   freq(employ.highest_education_collapsed_cop)
+
+24.26+50.04
 ```
 
 # Merge excluded data with analysis data
@@ -348,16 +350,13 @@ dat_merged %>%
   group_by(excluded) %>%
   freq(sex_final)
 
+test <-RVAideMemoire::chisq.bintest(descriptives_dummy$sex_final_Female ~ descriptives_dummy$excluded ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-sex <- table(descriptives_dummy$excluded,
-             descriptives_dummy$sex_final_Female
-             
-             )
 
-sex_chisq <- chisq.test(sex)
-
-# P value
-sex_chisq$p.value
+test$p.value
 ```
 
 # AS levels or higher
@@ -366,16 +365,13 @@ dat_merged %>%
   group_by(excluded) %>%
   freq(AS_Levels_higher)
 
+test <-RVAideMemoire::chisq.bintest(descriptives_dummy$AS_Levels_higher_Yes ~ descriptives_dummy$excluded ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-edu <- table(descriptives_dummy$excluded,
-             descriptives_dummy$AS_Levels_higher_Yes
-             
-             )
 
-edu_chisq <- chisq.test(edu)
-
-# P value
-edu_chisq$p.value
+test$p.value
 ```
 
 # Racially minoritised
@@ -384,17 +380,15 @@ dat_merged %>%
   group_by(excluded) %>%
   freq(racially_minoritised)
 
-race <- table(descriptives_dummy$excluded,
-             descriptives_dummy$racially_minoritised_Yes
-             
-             )
+test <-RVAideMemoire::chisq.bintest(descriptives_dummy$racially_minoritised_Yes ~ descriptives_dummy$excluded ,
+                                     alpha = 0.001,
+                             correct = F,
+                             p.method ="fdr")
 
-race_chisq <- chisq.test(race)
 
-# P value
-race_chisq$p.value
+test$p.value
 ```
-# Continious variables
+# Continuous variables
 ## Generate mode function
 ```{r mode function symptom}
 mode_func <- function(x, na.rm = FALSE) {
@@ -418,16 +412,16 @@ numeric_table <- dat_merged %>%
                     bmi_highest_dem),
     .funs =
       list(
-        ~mean(., na.rm = T),
-        ~sd(., na.rm = T),
+       # ~mean(., na.rm = T),
+       # ~sd(., na.rm = T),
         ~IQR(., na.rm=T),
-        mode = ~mode_func(., na.rm = T),
-        ~median(., na.rm = T),
-        ~min(., na.rm = T),
-        ~max(., na.rm = T),
-        missing = ~skimr::n_missing(.),
-        ~skew(., na.rm = T),
-        kurtosis = ~kurtosi(., na.rm = T)
+      #  mode = ~mode_func(., na.rm = T),
+        ~median(., na.rm = T)
+      #  ~min(., na.rm = T),
+      #  ~max(., na.rm = T),
+      #  missing = ~skimr::n_missing(.),
+      #  ~skew(., na.rm = T),
+      #  kurtosis = ~kurtosi(., na.rm = T)
       )
   )
 
@@ -499,9 +493,10 @@ Both assumptions violated; so performed the non-parametric equivalent of t-test:
 ```{r independent 2-group Mann-Whitney U test age }
 age_wilcox <- wilcox.test(dat_merged$age_dem ~ dat_merged$excluded_factor,
             correct = FALSE,
-            exact = FALSE)
+            exact = FALSE,
+            p.adjust.methods = "fdr")
 
-
+age_wilcox$p.value
 print(age_wilcox)
 ```
 ## BMI lowest
@@ -515,9 +510,10 @@ Both assumptions violated; so performed the non-parametric equivalent of t-test:
 ```{r independent 2-group Mann-Whitney U test bmi_lowest_dem }
 bmi_lowest_dem_wilcox <- wilcox.test(dat_merged$bmi_lowest_dem ~ dat_merged$excluded_factor,
             correct = FALSE,
-            exact = FALSE)
+            exact = FALSE,
+            p.adjust.methods = "fdr")
 
-
+bmi_lowest_dem_wilcox$p.value
 print(bmi_lowest_dem_wilcox)
 ```
 ## BMI highest
@@ -531,9 +527,10 @@ Both assumptions violated; so performed the non-parametric equivalent of t-test:
 ```{r independent 2-group Mann-Whitney U test bmi_highest_dem }
 bmi_highest_dem_wilcox <- wilcox.test(dat_merged$bmi_highest_dem ~ dat_merged$excluded_factor,
             correct = FALSE,
-            exact = FALSE)
+            exact = FALSE,
+            p.adjust.methods = "fdr")
 
-
+bmi_highest_dem_wilcox$p.value
 print(bmi_highest_dem_wilcox)
 ```
 
@@ -548,8 +545,9 @@ Both assumptions violated; so performed the non-parametric equivalent of t-test:
 ```{r independent 2-group Mann-Whitney U test bmi_signup_dem }
 bmi_signup_dem_wilcox <- wilcox.test(dat_merged$bmi_signup_dem ~ dat_merged$excluded_factor,
             correct = FALSE,
-            exact = FALSE)
+            exact = FALSE,
+            p.adjust.methods = "fdr")
 
-
+bmi_signup_dem_wilcox$p.value
 print(bmi_signup_dem_wilcox)
 ```
