@@ -21,7 +21,7 @@ remove(list = ls())
 
 Read in file with path to data channel
 ```{r Read in file with path to data channel on teams}
-source(file = "../credentials/paths.R")
+source(file = "../../credentials/paths.R")
 ```
 
 Add the add_numeric function - used to convert character variables into numeric variables
@@ -237,46 +237,79 @@ ethnicity <- ethnicity_nbr %>%
 Merged: GLAD optional, GLAD COPING, EDGI, NBR COPING
 Read in data
 ```{r Read in data ed.diagnoses}
-# GLAD
-ed_diagnoses_glad_signup <- readRDS(file = paste0(filepath, "/latest_freeze/glad/algorithms/ed_algorithms_diagnostics_glad_clean.rds"))
+# GLAD & EDGI BN
+BN_diagnoses_glad_edgi_signup <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/algorithms/ed_algorithms_bulimia_nervosa_glad_edgi_clean.rds"))
 
-ed_diagnoses_glad_signup %>%
+BN_diagnoses_glad_edgi_signup %>%
   dim()
 
-ed_diagnoses_glad_signup %>%
+BN_diagnoses_glad_edgi_signup %>%
   colnames()
 
+# GLAD & EDGI BED
+BED_diagnoses_glad_edgi_signup <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/algorithms/ed_algorithms_binge_eating_disorder_glad_edgi_clean.rds"))
+
+BED_diagnoses_glad_edgi_signup %>%
+  dim()
+
+BED_diagnoses_glad_edgi_signup %>%
+  colnames()
+
+# GLAD & EDGI AN 
+AN_diagnoses_glad_edgi_signup <- readRDS(file = paste0(filepath, "/latest_freeze/glad_edgi/algorithms/AN_algorithms_diagnostics_glad_edgi_clean.rds"))
+
+AN_diagnoses_glad_edgi_signup %>%
+  dim()
+
+AN_diagnoses_glad_edgi_signup %>%
+  colnames()
+
+
+# Merge
+ED_diagnoses_glad_edgi_signup1 <- dplyr::full_join(BN_diagnoses_glad_edgi_signup,
+                                                  BED_diagnoses_glad_edgi_signup,
+                                                  by = c("ID",
+                                                         "sample"))
+
+ED_diagnoses_glad_edgi_signup <- dplyr::full_join(ED_diagnoses_glad_edgi_signup1,
+                                                  AN_diagnoses_glad_edgi_signup,
+                                                  by = c("ID",
+                                                         "sample"))
 # Select columns
-ed_diagnoses_glad_signup <- ed_diagnoses_glad_signup %>%
+ED_diagnoses_glad_edgi_signup <- ED_diagnoses_glad_edgi_signup %>%
   select(ID,
          sample,
-         ed.DSM5_AN_binary_numeric,
-         ed.DSM5_AN_binary,
-         ed.DSM5_AN_restricting_binary,
-         ed.DSM5_AN_restricting_binary_numeric,
-         ed.DSM5_AN_binge_purge_binary_numeric,
-         ed.DSM5_AN_binge_purge_binary,
-         ed.DSM5_AN_binge_only_binary_numeric,
-       #  ed.DSM5_AN_binge_only_binary,
-         ed.DSM5_AN_purge_only_binary_numeric,
-       #  ed.DSM5_AN_purge_only_binary,
-         ed.DSM5_BED_binary,
-         ed.DSM5_BED_binary_numeric,
-         ed.DSM5_BN_binary,
-         ed.DSM5_BN_binary_numeric
+        ed.DSM5_AN_binary_numeric = ed.DSM5_AN_numeric,
+        ed.DSM5_AN_binary = ed.DSM5_AN,
+        ed.DSM5_AN_restricting_binary = ed.DSM5_AN_restricting,
+        ed.DSM5_AN_restricting_binary_numeric = ed.DSM5_AN_restricting_numeric,
+        ed.DSM5_AN_binge_purge_binary_numeric = ed.DSM5_AN_binge_purge_numeric,
+        ed.DSM5_AN_binge_purge_binary = ed.DSM5_AN_binge_purge,
+        ed.DSM5_AN_binge_only_binary_numeric = ed.DSM5_AN_binge_only_numeric,
+        ed.DSM5_AN_binge_only_binary = ed.DSM5_AN_binge_only,
+        ed.DSM5_AN_purge_only_binary_numeric = ed.DSM5_AN_purge_only_numeric,
+        ed.DSM5_AN_purge_only_binary = ed.DSM5_AN_purge_only,
+        ed.DSM5_AN_with_binge_binary_numeric = ed.DSM5_AN_with_binge_numeric,
+        ed.DSM5_AN_with_binge_binary = ed.DSM5_AN_with_binge,
+        ed.DSM5_AN_with_purge_binary_numeric = ed.DSM5_AN_with_purge_numeric,
+        ed.DSM5_AN_with_purge_binary = ed.DSM5_AN_with_purge,
+        ed.DSM5_BED_binary = ed.DSM5_BED,
+        ed.DSM5_BED_binary_numeric = ed.DSM5_BED_numeric,
+        ed.DSM5_BN_binary = ed.DSM5_BN,
+        ed.DSM5_BN_binary_numeric = ed.DSM5_BN_numeric
          )
 
-# GLAD COPING
-ed_diagnoses_glad_cop <- readRDS(file = paste0(filepath, "/latest_freeze/coping_glad/algorithms/ed_algorithms_diagnostics_coping_glad_clean.rds"))
+# GLAD COPING & NBR
+ed_diagnoses_glad_nbr_cop <- readRDS(file = paste0(filepath, "/latest_freeze/coping_glad_nbr/algorithms/ed_algorithms_diagnostics_coping_glad_nbr_clean.rds"))
 
-ed_diagnoses_glad_cop %>%
+ed_diagnoses_glad_nbr_cop %>%
   dim()
 
-ed_diagnoses_glad_cop %>%
+ed_diagnoses_glad_nbr_cop %>%
   colnames()
 
 # Select columns
-ed_diagnoses_glad_cop <- ed_diagnoses_glad_cop %>%
+ed_diagnoses_glad_nbr_cop <- ed_diagnoses_glad_nbr_cop %>%
   select(ID,
          sample,
          ed.DSM5_AN_binary_numeric_cop,
@@ -292,73 +325,30 @@ ed_diagnoses_glad_cop <- ed_diagnoses_glad_cop %>%
          ed.DSM5_AN_binge_only_binary_numeric_cop,
          ed.DSM5_AN_binge_only_binary_cop,
          ed.DSM5_AN_purge_only_binary_numeric_cop,
-         ed.DSM5_AN_purge_only_binary_cop
+         ed.DSM5_AN_purge_only_binary_cop,
+         ed.DSM5_AN_with_binge_binary_numeric_cop,
+         ed.DSM5_AN_with_binge_binary_cop,
+         ed.DSM5_AN_with_purge_binary_numeric_cop,
+         ed.DSM5_AN_with_purge_binary_cop
          )
 
 
-# Merge GLAD and GLAD COPING
+# Merge GLAD/EDGI and GLAD COPING/NBR
 # the ED100K was optional in GLAD but compulsory in COPING. So, there might be some people who are in one dataset but not another.
-ed_diagnoses_glad <- dplyr::full_join(ed_diagnoses_glad_cop,
-                          ed_diagnoses_glad_signup,
+ed_diagnoses <- dplyr::full_join(ed_diagnoses_glad_nbr_cop,
+                          ED_diagnoses_glad_edgi_signup,
                           by = c("ID",
                                   "sample"
                                   )
 )
 
 # Check
-ed_diagnoses_glad %>%
+ed_diagnoses %>%
   dim()
-
-# Check
-ed_diagnoses_glad %>%
-  nrow()
-
-ed_diagnoses_glad %>%
-  colnames()
-
-# EDGI
-ed_diagnoses_edgi <- readRDS(file = paste0(filepath, "/latest_freeze/edgi/algorithms/ed_algorithms_diagnostics_edgi_clean.rds"))
-
-ed_diagnoses_edgi %>%
-  dim()
-
-ed_diagnoses_edgi %>%
-  colnames()
-
-# NBR
-ed_diagnoses_nbr <- readRDS(file = paste0(filepath, "/latest_freeze/coping_nbr/algorithms/ed_algorithms_diagnostics_coping_nbr_clean.rds"))
-
-ed_diagnoses_nbr %>%
-  dim()
-
-ed_diagnoses_nbr %>%
-  colnames()
-
-# Select columns
-ed_diagnoses_nbr <- ed_diagnoses_nbr %>%
-  select(ID,
-         sample,
-         ed.DSM5_AN_binary_numeric_cop,
-         ed.DSM5_AN_binary_cop,
-         ed.DSM5_AN_restricting_binary_cop,
-         ed.DSM5_AN_restricting_binary_numeric_cop,
-         ed.DSM5_AN_binge_purge_binary_numeric_cop,
-         ed.DSM5_AN_binge_purge_binary_cop,
-         ed.DSM5_BED_binary_cop,
-         ed.DSM5_BED_binary_numeric_cop,
-         ed.DSM5_BN_binary_cop,
-         ed.DSM5_BN_binary_numeric_cop
-         )
-
-# Merge all data
-ed_diagnoses <- ed_diagnoses_glad %>%
-  bind_rows(ed_diagnoses_edgi,
-            ed_diagnoses_nbr
-            )
 
 # Check
 ed_diagnoses %>%
-  dim()
+  nrow()
 
 ed_diagnoses %>%
   colnames()
@@ -909,22 +899,14 @@ dat_merged_NA_rm <- dat_merged %>%
   mutate_if(is.numeric, ~na_if(., -888)) %>% # Recode missing values to NAs in numeric variables
   mutate_if(is.numeric, ~na_if(., -999)) %>%
   mutate_if(is.numeric, ~na_if(., -777)) %>%
-  mutate_if(is.numeric, ~na_if(., -666)) %>%
-  mutate_if(is.factor, ~na_if(., "Seen but not answered")) %>% # Recode missing values to NAs in factor variables
-  mutate_if(is.factor, ~na_if(., "Don't know")) %>%
-  mutate_if(is.factor, ~na_if(., "Prefer not to say")) %>%
-  mutate_if(is.factor, ~na_if(., "Prefer not to answer")) %>%
-  mutate_if(is.factor, ~forcats::fct_drop(., only = "Seen but not answered")) %>% # Drop empty factor levels
-  mutate_if(is.factor, ~forcats::fct_drop(., only = "Don't know")) %>%
-  mutate_if(is.factor, ~forcats::fct_drop(., only = "Prefer not to answer")) %>%
-  mutate_if(is.factor, ~forcats::fct_drop(., only = "Prefer not to say"))
+  mutate_if(is.numeric, ~na_if(., -666)) 
 ```
 
 # Save merged data
 ```{r save merged data}
 dat_merged_NA_rm %>% 
   saveRDS(
-    file = paste0("../data/dat_merged_", 
+    file = paste0("../../data/dat_merged_", 
     date, 
     ".rds"
     )

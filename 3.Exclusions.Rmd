@@ -21,7 +21,7 @@ remove(list = ls())
 
 Read in file with path to data channel
 ```{r Read in file with path to data channel on teams}
-source(file = "../credentials/paths.R")
+source(file = "../../credentials/paths.R")
 ```
 
 Add the add_numeric function - used to convert character variables into numeric variables
@@ -52,15 +52,16 @@ date
 
 # Read in merged data with variables
 ```{r read in merged data}
-dat <- readRDS(file = paste0("../data/dat_variables_2022-03-15.rds"))
-dim(dat) 
-colnames(dat)
+dat <- readRDS(file = paste0("../../data/dat_variables_2022-03-15.rds"))
+
+dat <- dat %>%
+  filter(sample != "RAMP")
 ```
 
 # Check number of overall participants before exclusion
 ```{r number of participants before exclusion}
 dat %>%
-  nrow()
+  nrow() 
 ```
 
 # Check where participants are from before exclusion criteria applied - detailed
@@ -125,20 +126,10 @@ dat %>%
   freq(cohort)
 ```
 
+  
 # Create two datasets
-1) Diagnosis dataset
-2) Symptom dataset
+1) Symptom dataset
 ```{r creating two separate datasets}
-# Diagnosis data
-diagnosis_dat <- dat %>%
-  filter(bulimia_nervosa == 1 |
-           anorexia_nervosa_binge_purge == 1 |
-           binge_eating_disorder == 1)
-
-# Check 
-diagnosis_dat %>%
-  dim()
-
 # Symptom data
 ## First, exclude NBR participants with missing cohort information or age or sex (i.e., did not answer questionnaires)
 dat <- dat %>%
@@ -168,57 +159,6 @@ symptom_dat %>%
 
 # Missing for BE
 70648-40228
-```
-
-# Exclusions for missingness 
-# Diagnosis data
-## Sex
-Exclude participants with missing sex
-```{r sex missing diagnosis data}
-dim(diagnosis_dat)
-diagnosis_dat_excl_sex <- diagnosis_dat %>%
-  drop_na(sex_final)
-nrow(diagnosis_dat_excl_sex)-nrow(diagnosis_dat)
-```
-356 participants did not report their biological sex
-
-## Age
-Exclude participants with missing age
-```{r missing age in sample diagnosis data}
-dim(diagnosis_dat_excl_sex)
-diagnosis_dat_excl_sex_age <- diagnosis_dat_excl_sex %>%
-  drop_na(age_dx_level)
-nrow(diagnosis_dat_excl_sex_age)-nrow(diagnosis_dat_excl_sex)
-```
-A further 422 participants did not report their age
-
-## MDQ
-Exclude participants that had missing MDQ values
-```{r mdq exclusion participants with implausible values diagnosis data}
-dim(diagnosis_dat_excl_sex_age)
-diagnosis_dat_excl_sex_age_mdq <- diagnosis_dat_excl_sex_age %>%
-  drop_na(
-      more_hyperactivity_dx_level,
-      more_irritability_dx_level,
-      more_self_confidence_dx_level,
-      less_sleep_dx_level,      
-      more_talkative_dx_level,
-      racing_thoughts_dx_level,
-      conc_difficulties_dx_level,
-      more_energy_dx_level,
-      more_active_dx_level,
-      more_social_dx_level,  
-      higher_libido_dx_level,
-      more_risky_beh_dx_level,
-      reckless_spending_dx_level
-    )
-nrow(diagnosis_dat_excl_sex_age_mdq)-nrow(diagnosis_dat_excl_sex)
-```
-An additional 2182 individuals excluded because they are missing an item on the mdq
-
-### Tidy tibble for analysis
-```{r Tidy tibble for analysis diagnosis data}
-diagnosis_dat_analysis <- diagnosis_dat_excl_sex_age_mdq
 ```
 
 #  Symptom data
@@ -253,6 +193,7 @@ symptom_dat_excl_sex_age <- symptom_dat_excl_sex_age %>%
 Exclude participants that had missing MDQ values
 ```{r mdq exclusion participants with implausible values symptom data}
 dim(symptom_dat_excl_sex_age)
+
 symptom_dat_excl_sex_age_mdq <- symptom_dat_excl_sex_age %>%
   drop_na(
       more_hyperactivity_numeric_sx_level,
@@ -315,11 +256,95 @@ symptom_dat_analysis %>%
   freq(cohort)
 ```
 
+## Read in revised diagnosis data
+```{r revised diagnosis data}
+revised_diag_dat <- readRDS(file = "../../data/dat_variables_2023-04-11.rds")
+
+# Select those in original symptom dataset
+revised_diag_dat <- revised_diag_dat %>%
+  filter(ID %in% symptom_dat_analysis$ID)
+```
+
+# 2) Diagnosis dataset
+```{r create diagnosis dataset}
+diagnosis_dat <- revised_diag_dat %>%
+  filter(bulimia_nervosa == 1 |
+           anorexia_nervosa_binge_purge == 1 |
+           binge_eating_disorder == 1)
+
+# Check 
+diagnosis_dat %>%
+  dim()
+
+diagnosis_dat %>%
+  freq(bulimia_nervosa)
+
+diagnosis_dat %>%
+  freq(anorexia_nervosa_binge_purge)
+
+diagnosis_dat %>%
+  freq(binge_eating_disorder)
+
+4075+825+5563 # 10463 with EDs
+```
+
+# Exclusions for missingness 
+# Diagnosis data
+## Sex
+Exclude participants with missing sex
+```{r sex missing diagnosis data}
+dim(diagnosis_dat)
+diagnosis_dat_excl_sex <- diagnosis_dat %>%
+  drop_na(sex_final)
+nrow(diagnosis_dat_excl_sex)-nrow(diagnosis_dat)
+```
+538 participants did not report their biological sex
+
+## Age
+Exclude participants with missing age
+```{r missing age in sample diagnosis data}
+dim(diagnosis_dat_excl_sex)
+diagnosis_dat_excl_sex_age <- diagnosis_dat_excl_sex %>%
+  drop_na(age_dx_level)
+nrow(diagnosis_dat_excl_sex_age)-nrow(diagnosis_dat_excl_sex)
+```
+A further 0 participants did not report their age
+
+## MDQ
+Exclude participants that had missing MDQ values
+```{r mdq exclusion participants with implausible values diagnosis data}
+dim(diagnosis_dat_excl_sex_age)
+
+diagnosis_dat_excl_sex_age_mdq <- diagnosis_dat_excl_sex_age %>%
+  drop_na(
+      more_hyperactivity_dx_level,
+      more_irritability_dx_level,
+      more_self_confidence_dx_level,
+      less_sleep_dx_level,      
+      more_talkative_dx_level,
+      racing_thoughts_dx_level,
+      conc_difficulties_dx_level,
+      more_energy_dx_level,
+      more_active_dx_level,
+      more_social_dx_level,  
+      higher_libido_dx_level,
+      more_risky_beh_dx_level,
+      reckless_spending_dx_level
+    )
+nrow(diagnosis_dat_excl_sex_age_mdq)-nrow(diagnosis_dat_excl_sex)
+```
+An additional 0 individuals excluded because they are missing an item on the mdq
+
+### Tidy tibble for analysis
+```{r Tidy tibble for analysis diagnosis data}
+diagnosis_dat_analysis <- diagnosis_dat_excl_sex_age_mdq
+```
+
 ## Save tidy data
 ```{r Save data in rds files}
 # Export diagnosis data
 saveRDS(diagnosis_dat_analysis,
-  file = paste0("../data/diagnosis_dat_analysis",
+  file = paste0("../../data/diagnosis_dat_analysis",
                 date,
                 ".rds"
                 )
@@ -327,7 +352,7 @@ saveRDS(diagnosis_dat_analysis,
 
 # Export symptom data
 saveRDS(symptom_dat_analysis,
-  file = paste0("../data/symptom_dat_analysis",
+  file = paste0("../../data/symptom_dat_analysis",
                 date,
                 ".rds"
                 )
@@ -336,7 +361,7 @@ saveRDS(symptom_dat_analysis,
 # Export excluded data
 dat %>%
   filter(ID %!in% symptom_dat_main_analysis$ID) %>%
-saveRDS(file = paste0("../data/excluded_dat_analysis",
+  saveRDS(file = paste0("../../data/excluded_dat_analysis",
                 date,
                 ".rds"
                 )

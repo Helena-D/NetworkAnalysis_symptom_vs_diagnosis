@@ -21,7 +21,7 @@ remove(list = ls())
 
 Read in file with path to data channel
 ```{r Read in file with path to data channel on teams}
-source(file = "../credentials/paths.R")
+source(file = "../../credentials/paths.R")
 ```
 
 Add the add_numeric function - used to convert character variables into numeric variables
@@ -984,14 +984,14 @@ networkcomparison_no_BE_v_BE_no_loss_control$diffcen.pval # p-values (corrected 
 
 # Compare centrality indices: MULTIPLE COMPARISONS
 ```{r Compare centrality indicies both}
-centralityplot <- centralityPlot(list("Binge eating with loss of control" = BE_network_bootnet,
-                                      "Binge eating no loss of control" = BE_no_loss_control_network_bootnet,
-                                      "No binge eating" = no_BE_network_bootnet),
+centralityplot <- centralityPlot(list("Binge eating (with loss of control)" = BE_network_bootnet,
+                                      "Overeating (no loss of control)" = BE_no_loss_control_network_bootnet,
+                                      "No binge eating or overeating" = no_BE_network_bootnet),
                                       include = "ExpectedInfluence",
                                       orderBy = "ExpectedInfluence",
                                       labels = longnames)
 
-png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/centrality_diff_sens_loss_control.png"))
+png(file = paste0(filepath_plots, "/revised_symptom/centrality_diff_sens_loss_control",date,".png"))
 
 centralityplot + 
    labs(x = "Centrality indices",

@@ -1,0 +1,1100 @@
+---
+title: 'Sensitivity analysis: Smallest group size (n = 825)'
+author: "Helena Davies"
+date: "18/12/2021"
+output: html_document
+---
+
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  comment = '',
+  prompt = FALSE,
+  cache = FALSE
+  )
+```
+
+Clear global environment prior to initiation
+```{r Clear global environment}
+remove(list = ls())
+```
+
+Read in file with path to data channel
+```{r Read in file with path to data channel on teams}
+source(file = "../../credentials/paths.R")
+```
+
+Add the add_numeric function - used to convert character variables into numeric variables
+Add the remove_duplicates function - used to deduplicate and remove NAs from IDs
+Add the sumscores function - used to generate sumscores
+Add the package_check function - used to install and load dependencies
+Add the imp_check function - used to check variables for implausible values
+```{r Read in functions}
+source(file = paste0(filepath_functions, "add_numeric.R"))
+source(file = paste0(filepath_functions, "remove_duplicates.R"))
+source(file = paste0(filepath_functions, "package_check.R"))
+source("./functions.R")
+```
+
+Use package_check to install and load dependencies
+Load tidyverse last
+```{r Install load dependencies}
+packages <- c("summarytools",
+              "sjlabelled",
+              "Amelia",
+              "gtsummary",
+              "janitor",
+              "psych",
+              "corrplot",
+              "rstatix",
+              "networktools",
+              "nnet",
+              "bootnet",
+              "caret",
+              "Matrix",
+              "qgraph",
+              "NetworkComparisonTest",
+              "tidyverse")
+package_check(packages)
+```
+
+Retrieve recent date
+We are using the recent date to save files with paste0() as an extension to not overwrite old versions
+```{r Recent date}
+date <- Sys.Date()
+date
+```
+
+# Read in merged data with variables created
+Read in data 
+```{r Read in data}
+# Symptom dat
+symptom_dat <- readRDS(file = "../../data/symptom_dat_analysis2023-04-06.rds")
+dim(symptom_dat)
+colnames(symptom_dat)
+
+# Select and rename variables
+symptom_dat <- symptom_dat %>%
+  select(
+    ID,
+    age = age_sx_level,
+    sex = sex_final,
+    sex_numeric = sex_final_numeric,
+    ethnicity,
+    bmi_signup = bmi_signup_sx_level,
+    bmi_lowest =bmi_lowest_sx_level,
+    bmi_highest = bmi_highest_sx_level,
+    more_hyperactivity = more_hyperactivity_sx_level,
+    more_irritability= more_irritability_sx_level,
+    more_self_confidence = more_self_confidence_sx_level,
+    less_sleep = less_sleep_sx_level,                    
+    more_talkative = more_talkative_sx_level,
+    racing_thoughts = racing_thoughts_sx_level,
+    conc_difficulties = conc_difficulties_sx_level,     
+    more_energy = more_energy_sx_level,
+    more_active = more_active_sx_level,
+    more_social = more_social_sx_level,             
+    higher_libido = higher_libido_sx_level,
+    more_risky_beh = more_risky_beh_sx_level,
+    reckless_spending = reckless_spending_sx_level,
+   
+    more_hyperactivity_numeric = more_hyperactivity_numeric_sx_level,
+   more_irritability_numeric= more_irritability_numeric_sx_level,
+   more_self_confidence_numeric = more_self_confidence_numeric_sx_level,
+   less_sleep_numeric = less_sleep_numeric_sx_level,                    
+   more_talkative_numeric = more_talkative_numeric_sx_level,
+   racing_thoughts_numeric = racing_thoughts_numeric_sx_level,
+   conc_difficulties_numeric = conc_difficulties_numeric_sx_level,     
+   more_energy_numeric = more_energy_numeric_sx_level,
+   more_active_numeric = more_active_numeric_sx_level,
+   more_social_numeric = more_social_numeric_sx_level,             
+   higher_libido_numeric = higher_libido_numeric_sx_level,
+   more_risky_beh_numeric = more_risky_beh_numeric_sx_level,
+   reckless_spending_numeric = reckless_spending_numeric_sx_level,
+   
+   binge_eating_with_loss_control,
+   binge_eating_with_loss_control_numeric
+    ) 
+```
+
+### Abbreviations of symptoms 
+```{r abbreviations of symptoms }
+shortnames <- c(
+  "hyp",
+                "irr",
+                "scf",
+                "sle",
+                "talk",
+                "rac",
+                "con",
+                "ene",
+                "act",
+                "soc",
+                "lib",
+                "ris",
+                "mon",
+                "sex",
+                "age")
+```
+
+### Long names 
+```{r nodes long names }
+longnames <- c(
+  "Hyperactivity",
+  "More irritability",
+  "More self-confidence",
+  "Less sleep",
+  "More talkative",
+  "Racing thoughts",
+  "Concentration difficulties",
+  "More energy",
+  "More active",
+  "More social",
+  "Higher libido",
+  "Unusual and/or risky behaviour",
+  "Reckless spending",
+  "Sex",
+  "Age"
+  )
+```
+
+# BE - downsampled to 825
+### Symptom data
+Main nodes:
+1...you felt so good or so hyper that other people thought you were not your normal self or you were so hyper that you got into trouble? (hyp)
+2...you got much less sleep than usual and found you didn't really miss it? (sle)
+3...you were so easily distracted by things around you that you had trouble concentrating or staying on track? (con)
+4...you were much more social or outgoing than usual, for example, you telephoned friends in the middle of the night? (soc)
+5..spending money got you or your family into trouble? (mon)
+6...you were so irritable that you shouted at people or start fights or arguments? (irr)
+7...you were much more talkative or spoke much faster than usual? (tal)
+8...you had much more energy than usual? (ene)
+9...you were much more interested in sex than usual? (sex)
+10...you felt much more self-confident than usual? (scf)
+11...thoughts raced through your head or you couldn't slow your mind down? (rac)
+12..you were much more active or did many more things than usual? (act)
+13...you did things that were unusual for you or that other people might have thought were excessive, foolish, or risky? (ris)
+```{r goldbrick function assessing collinearity diagnosis data symptom data}
+mania_nodes_BE <- symptom_dat %>%
+   filter(binge_eating_with_loss_control == "BE loss control") %>%
+  select(
+   more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric,
+   sex_numeric,
+   age
+  )
+
+# Select random subsample, same size as ANBP (i.e., smallest group) sample
+set.seed(123)
+mania_nodes_BE <- mania_nodes_BE[sample(1:nrow(mania_nodes_BE), 
+                                        825,
+                                        replace=FALSE),
+                                 ]
+```
+
+# BE network
+### Generate initial network for use in generating predictability estimates BE
+```{r initial network for use in predictability BE}
+# Type of variable. C = categorical, g = gaussian
+type = c(rep("c", 14),
+         "g")
+
+# Number of levels. For the first 14 variables, there are 2 levels (0 and 1). The last variable (age) is continuous so level is set to 1.
+level = c(rep(2, 14), 
+          1) 
+
+BE_network <- mgm::mgm(mania_nodes_BE,
+                  type = type,
+                  level = level,
+                  lambdaSel = "EBIC",
+                  lambdaGam = 0.25,
+                  binarySign = TRUE, 
+                  scale = TRUE)
+```
+
+### Adding predictability of nodes BE
+From this paper: https://link.springer.com/article/10.3758/s13428-017-0910-x
+```{r generating predictability of nodes BE}
+p_obj <- predict(object = BE_network,
+                 data = mania_nodes_BE,
+                 errorCat = c("CC", "nCC", "CCmarg"),
+                 errorCon = c("R2"))
+
+p_obj$error
+
+# To display both the accuracy of the intercept model and the normalized accuracy (contribution by other variables), we require a list for the ring-segments and a list for the corresponding colors:
+
+error_list_BE <- list() # List for ring segments
+beyondmarg <- vector()
+
+for(i in 1:14) beyondmarg[[i]] <- p_obj$errors[i, 3]-p_obj$errors[i, 5]
+for(i in 1:14) error_list_BE[[i]] <- c(p_obj$errors[i, 5], beyondmarg[[i]])
+error_list_BE[[15]] <- p_obj$errors[15,2]
+
+color_list <- list() # List for colours
+for(i in 1:14) color_list[[i]] <- c("#ffa500", "#ff4300")
+#color_list[[15]] <- p_obj$errors[15,2]
+color_list[[15]] <- "#90B4D4"
+```
+
+### Walktrap algorithm: 
+https://www.nature.com/articles/srep05918
+https://pure.uva.nl/ws/files/21235882/Network_Analysis_on_Attitudes.png
+Walktrap, developed by Pascal Pons, is an algorithm in graph theory, used to identify communities in large networks via random walks. These random walks are then used to compute distances between nodes. Nodes are then assigned into groups with small intra and larger inter-community distances via bottom-up hierarchical clustering. It should be noted, of course, that this algorithm considers only one community per node, which in some cases can be an incorrect hypothesis.
+```{r walktrap algorithm BE}
+# Create an igraph object containing the information on the  network and take the absolute values of the edge weights because the walktrap algorithm can only deal with positive edge values
+BE_network <- estimateNetwork(mania_nodes_BE,
+                               default = "mgm",
+                               type = type,
+                               level = level,
+                               tuning = 0.25,
+                               binarySign = TRUE)
+
+
+BEigraph <- igraph::graph_from_adjacency_matrix(abs(BE_network$graph), 
+                                      weighted =TRUE,
+                                      add.colnames = FALSE)
+
+
+# Run walktrap algorithm on the network 
+BECom <- igraph::cluster_walktrap(BEigraph)
+
+# Extract the found communities using the following command:
+BEcommunities <- igraph::communities(BECom)
+
+# Manually move age and sex into their own community (they are covariates. We estimated the groups first because we need the associations that have been adjusted for age and sex, but do not want them to form part of a group because they are not symptoms)
+BEcommunities$`4` <- c(14,
+                       15)
+
+BEcommunities$`5` <- NULL
+
+# Rename clusters
+BEcommunities$`Cluster 1` <- BEcommunities$`1` 
+BEcommunities$`1`  <- NULL
+
+BEcommunities$`Cluster 2` <- BEcommunities$`2` 
+BEcommunities$`2`  <- NULL
+
+BEcommunities$`Cluster 3` <-BEcommunities$`3` 
+BEcommunities$`3`  <- NULL
+
+BEcommunities$`Covariates` <-BEcommunities$`4` 
+BEcommunities$`4`  <- NULL
+```
+
+### Plot BE network with walktrap algorithm AND predictability of nodes 
+Using mgm package
+```{r plotting BE network with walktrap and predictability}
+# Type of variable. C = categorical, g = gaussian
+type = c(rep("c", 14),
+         "g")
+
+# Number of levels. For the first 14 variables, there are 2 levels (0 and 1). The last variable (age) is continuous so level is set to 1.
+level = c(rep(2, 14), 
+          1) 
+
+BE_network <- mgm::mgm(mania_nodes_BE,
+                  type = type,
+                  level = level,
+                  lambdaSel = "EBIC",
+                  lambdaGam = 0.25,
+                  binarySign = TRUE, 
+                  scale = TRUE)
+
+BE_network_plot <- qgraph::qgraph(BE_network$pairwise$wadj, # weighted adjacency matrix as input
+       #layout = layout, 
+       pie = error_list_BE, # provide errors as input
+       pieColor = color_list,
+       edge.color = "blue3",
+       cut = 0, 
+       labels = shortnames,
+       nodeNames = longnames,
+       groups =  BEcommunities,
+       palette = "colorblind",
+       label.scale = T,
+       title = "Sensitivity: Network of mania symptoms in BE sample,
+                   n = 825"
+      )
+```
+
+### Plot using the bootnet package for use in later analyses (e.g., centrality estimates, etc)
+```{r plotting network using estimateNetwork BE}
+BE_network_bootnet <- estimateNetwork(mania_nodes_BE,
+                               default = "mgm",
+                               type = type,
+                               level = level,
+                               tuning = 0.25,
+                               binarySign = TRUE,
+                               criterion = "EBIC",
+                               labels = shortnames)
+
+
+BE_network_bootnet_plot <- plot(BE_network_bootnet,
+                           layout = "spring",
+                           labels = shortnames, 
+                           nodeNames = longnames,
+                           legend = TRUE,
+                           title = paste("Sensitivity: Symptom network of mania items in BE sample,
+                   n =", BE_network_bootnet$nPerson))
+```
+
+### BE network information
+```{r BE network information BE}
+BE_network_bootnet$graph # the weights (adjacency) matrix of the network (symmetrical in undirected networks)
+BE_network_bootnet$intercepts # the thresholds (represent the intercept for each symptom in the regularized logistic regression analyses used to estimate the networks)
+BE_network_bootnet$results # weights matrix and intercepts
+BE_network_bootnet$labels # variable labels
+BE_network_bootnet$nNodes # number of nodes in network
+BE_network_bootnet$nPerson # number of persons in network
+```
+
+### BE centrality estimates
+```{r centrality estimates BE}
+# Raw centrality measures (not standardised)
+qgraph::centrality(BE_network_bootnet)
+
+# Standardised centrality estimates [node strength]
+plot(qgraph::centrality(BE_network_bootnet)$InDegree,
+     type = "b") 
+
+# Standardised centrality estimated for four centrality indices
+qgraph::centralityTable(BE_network_bootnet,
+                        labels = longnames)
+
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_centrality_plot_BE.png"))
+
+qgraph::centralityPlot(BE_network_bootnet,
+               include ="all",
+               labels = longnames) 
+
+dev.off()
+```
+
+### BE Edge weight accuracy
+Use the bootnet() function to estimate edge weight accuracy and centrality stability and plot them
+See: Estimating psychological networks and their accuracy: A tutorial paper
+Bootstrapping = picking people with replacement, i.e. each sample will have a different composition of people (e.g. choosing a random 70% of the sample each time)
+```{r edge weight accuracy BE network}
+edge_accuracy_BE_network <- bootnet(BE_network_bootnet,
+                                     nBoots = 1000, 
+                                     nCores = 4,
+                                     statistics = c("edge", 
+                                                    "strength",
+                                                    "betweenness",
+                                                    "closeness",
+                                                    "expectedInfluence"),
+                                     labels = shortnames
+                                     ) 
+
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_edge_accuracy_plot_BE.png"))
+
+plot(edge_accuracy_BE_network,
+                                      #plot = "interval",
+                                      # split0 = TRUE,
+                                      order = "sample",
+                                       labels = TRUE)
+
+dev.off()
+
+edge_accuracy_BE_network_plot <- plot(edge_accuracy_BE_network,
+                                      #plot = "interval",
+                                      # split0 = TRUE,
+                                      order = "sample",
+                                       labels = TRUE)
+
+dev.off()
+
+edge_accuracy_BE_network_plot
+
+
+# This function makes a ’multiverse’ plot of bootstrap results. Every row indicates an edge and every column a bootstrap; colors are in line of the edge strength as drawn with plot.bootnetResult.
+#multiverse(edge_accuracy_BE_network_plot,
+#           labels = T) 
+```
+
+### BE centrality accuracy
+```{r centrality accuracy BE network}
+centrality_stability_BE_network <- bootnet(BE_network_bootnet,
+                                nBoots = 1000, 
+                                nCores = 1,
+                                type = "case", #case-dropping bootstrap
+                                statistics = c("closeness",
+                                               "strength",
+                                               "betweenness",
+                                               "expectedInfluence")) 
+
+centrality_stability_BE_network
+
+# Table of all statistics from original sample 
+centrality_stability_BE_network$sampleTable 
+
+# Results of bootstrap
+centrality_stability_BE_network$boots
+
+# Table of all statistics from bootstraps
+centrality_stability_BE_network$bootTable
+
+# Plot centrality stability
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_centrality_stability_plot_BE.png"))
+
+plot(centrality_stability_BE_network,
+     statistics = "expectedInfluence")
+
+dev.off()
+
+centrality_stability_BE_network_plot <- plot(centrality_stability_BE_network,
+                                                statistics ="expectedInfluence")
+centrality_stability_BE_network_plot
+
+
+# CS-coefficient (to quantify the centrality stability)
+corStability(centrality_stability_BE_network,
+              cor = 0.7,
+              statistics = "all")
+```
+
+### Test significance of differences (between edge weights and node centralities) to test for differences within a single network 
+```{r test significance of differences of specific edge weight BE network}
+# Plot significant differences (alpha = 0.05) of edge weights:
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_sig_diff_edges_plot_BE.png"))
+
+plot(edge_accuracy_BE_network,
+     "edge",
+     plot = "difference",
+     onlyNonZero = TRUE,
+     order = "sample",
+     labels = TRUE
+     )
+
+dev.off()
+```
+
+Significance: Node centralities
+```{r test significance of differences of node centralities BE network}
+# Plot significant differences (alpha = 0.05) of node centrality eg. strength for all nodes:
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_sig_diff_centrality_plot_BE.png"))
+
+plot(edge_accuracy_BE_network,
+     "expectedInfluence",
+     plot = "difference",
+     order = "sample"
+     ) # Note: use edge accuracy estimates for this as centrality is a measure of connecting edges
+
+dev.off()
+# Test for difference in strength between specific nodes - perhaps more useful if you have apriori reason to explore specific differents in nodes
+# Eg. difference in centrality between ene and expectedInfluence for strength 
+# differenceTest(edge_accuracy_ED_network,  "ene", "rac", "expectedInfluence")
+```
+
+# No BE - downsampled to 825
+### Symptom data
+Main nodes:
+1...you felt so good or so hyper that other people thought you were not your normal self or you were so hyper that you got into trouble? (hyp)
+2...you got much less sleep than usual and found you didn't really miss it? (sle)
+3...you were so easily distracted by things around you that you had trouble concentrating or staying on track? (con)
+4...you were much more social or outgoing than usual, for example, you telephoned friends in the middle of the night? (soc)
+5..spending money got you or your family into trouble? (mon)
+6...you were so irritable that you shouted at people or start fights or arguments? (irr)
+7...you were much more talkative or spoke much faster than usual? (tal)
+8...you had much more energy than usual? (ene)
+9...you were much more interested in sex than usual? (sex)
+10...you felt much more self-confident than usual? (scf)
+11...thoughts raced through your head or you couldn't slow your mind down? (rac)
+12..you were much more active or did many more things than usual? (act)
+13...you did things that were unusual for you or that other people might have thought were excessive, foolish, or risky? (ris)
+```{r goldbrick function assessing collinearity diagnosis data symptom data}
+mania_nodes_no_BE <- symptom_dat %>%
+   filter(binge_eating_with_loss_control == "No BE") %>%
+  select(
+   more_hyperactivity_numeric,
+   more_irritability_numeric,
+   more_self_confidence_numeric,
+   less_sleep_numeric,                    
+   more_talkative_numeric,
+   racing_thoughts_numeric,
+   conc_difficulties_numeric,     
+   more_energy_numeric,
+   more_active_numeric,
+   more_social_numeric,             
+   higher_libido_numeric,
+   more_risky_beh_numeric,
+   reckless_spending_numeric,
+   sex_numeric,
+   age
+  )
+
+# Select random subsample, same size as ANBP (i.e., smallest group) sample
+set.seed(123)
+mania_nodes_no_BE <- mania_nodes_no_BE[sample(1:nrow(mania_nodes_no_BE), 
+                                        825,
+                                        replace=FALSE),
+                                 ]
+```
+
+# No BE network
+### Generate initial network for use in generating predictability estimates no_BE
+```{r initial network for use in predictability no_BE}
+# Type of variable. C = categorical, g = gaussian
+type = c(rep("c", 14),
+         "g")
+
+# Number of levels. For the first 14 variables, there are 2 levels (0 and 1). The last variable (age) is continuous so level is set to 1.
+level = c(rep(2, 14), 
+          1) 
+
+no_BE_network <- mgm::mgm(mania_nodes_no_BE,
+                  type = type,
+                  level = level,
+                  lambdaSel = "EBIC",
+                  lambdaGam = 0.25,
+                  binarySign = TRUE, 
+                  scale = TRUE)
+```
+
+### Adding predictability of nodes no_BE
+From this paper: https://link.springer.com/article/10.3758/s13428-017-0910-x
+```{r generating predictability of nodes no_BE}
+p_obj <- predict(object = no_BE_network,
+                 data = mania_nodes_no_BE,
+                 errorCat = c("CC", "nCC", "CCmarg"),
+                 errorCon = c("R2"))
+
+p_obj$error
+
+# To display both the accuracy of the intercept model and the normalized accuracy (contribution by other variables), we require a list for the ring-segments and a list for the corresponding colors:
+
+error_list_no_BE <- list() # List for ring segments
+beyondmarg <- vector()
+
+for(i in 1:14) beyondmarg[[i]] <- p_obj$errors[i, 3]-p_obj$errors[i, 5]
+for(i in 1:14) error_list_no_BE[[i]] <- c(p_obj$errors[i, 5], beyondmarg[[i]])
+error_list_no_BE[[15]] <- p_obj$errors[15,2]
+
+color_list <- list() # List for colours
+for(i in 1:14) color_list[[i]] <- c("#ffa500", "#ff4300")
+#color_list[[15]] <- p_obj$errors[15,2]
+color_list[[15]] <- "#90B4D4"
+```
+
+### Walktrap algorithm: 
+https://www.nature.com/articles/srep05918
+https://pure.uva.nl/ws/files/21235882/Network_Analysis_on_Attitudes.png
+Walktrap, developed by Pascal Pons, is an algorithm in graph theory, used to identify communities in large networks via random walks. These random walks are then used to compute distances between nodes. Nodes are then assigned into groups with small intra and larger inter-community distances via bottom-up hierarchical clustering. It should be noted, of course, that this algorithm considers only one community per node, which in some cases can be an incorrect hypothesis.
+```{r walktrap algorithm no_BE}
+# Create an igraph object containing the information on the  network and take the absolute values of the edge weights because the walktrap algorithm can only deal with positive edge values
+no_BE_network <- estimateNetwork(mania_nodes_no_BE,
+                               default = "mgm",
+                               type = type,
+                               level = level,
+                               tuning = 0.25,
+                               binarySign = TRUE)
+
+
+no_BEigraph <- igraph::graph_from_adjacency_matrix(abs(no_BE_network$graph), 
+                                      weighted =TRUE,
+                                      add.colnames = FALSE)
+
+
+# Run walktrap algorithm on the network 
+no_BECom <- igraph::cluster_walktrap(no_BEigraph)
+
+# Extract the found communities using the following command:
+no_BEcommunities <- igraph::communities(no_BECom)
+
+# Manually move age and sex into their own community (they are covariates. We estimated the groups first because we need the associations that have been adjusted for age and sex, but do not want them to form part of a group because they are not symptoms)
+
+# Rename clusters
+no_BEcommunities$`Covariates` <- no_BEcommunities$`1` 
+no_BEcommunities$`1`  <- NULL
+
+no_BEcommunities$`Cluster 1` <- no_BEcommunities$`2` 
+no_BEcommunities$`2`  <- NULL
+
+no_BEcommunities$`Cluster 2` <- no_BEcommunities$`3` 
+no_BEcommunities$`3`  <- NULL
+```
+
+### Plot no_BE network with walktrap algorithm AND predictability of nodes 
+Using mgm package
+```{r plotting no_BE network with walktrap and predictability}
+# Type of variable. C = categorical, g = gaussian
+type = c(rep("c", 14),
+         "g")
+
+# Number of levels. For the first 14 variables, there are 2 levels (0 and 1). The last variable (age) is continuous so level is set to 1.
+level = c(rep(2, 14), 
+          1) 
+
+no_BE_network <- mgm::mgm(mania_nodes_no_BE,
+                  type = type,
+                  level = level,
+                  lambdaSel = "EBIC",
+                  lambdaGam = 0.25,
+                  binarySign = TRUE, 
+                  scale = TRUE)
+
+no_BE_network_plot <- qgraph::qgraph(no_BE_network$pairwise$wadj, # weighted adjacency matrix as input
+       #layout = layout, 
+       pie = error_list_no_BE, # provide errors as input
+       pieColor = color_list,
+       edge.color = "blue3",
+       cut = 0, 
+       labels = shortnames,
+       nodeNames = longnames,
+       groups =  no_BEcommunities,
+       palette = "colorblind",
+       label.scale = T,
+       title = "Sensitivity: Network of mania symptoms in no_BE sample,
+                   n = 825"
+      )
+```
+
+### Plot using the bootnet package for use in later analyses (e.g., centrality estimates, etc)
+```{r plotting network using estimateNetwork no_BE}
+no_BE_network_bootnet <- estimateNetwork(mania_nodes_no_BE,
+                               default = "mgm",
+                               type = type,
+                               level = level,
+                               tuning = 0.25,
+                               binarySign = TRUE,
+                               criterion = "EBIC",
+                               labels = shortnames)
+
+
+no_BE_network_bootnet_plot <- plot(no_BE_network_bootnet,
+                           layout = "spring",
+                           labels = shortnames, 
+                           nodeNames = longnames,
+                           legend = TRUE,
+                           title = paste("Sensitivity: Symptom network of mania items in no_BE sample,
+                   n =", no_BE_network_bootnet$nPerson))
+```
+
+### no_BE network information
+```{r no_BE network information no_BE}
+no_BE_network_bootnet$graph # the weights (adjacency) matrix of the network (symmetrical in undirected networks)
+no_BE_network_bootnet$intercepts # the thresholds (represent the intercept for each symptom in the regularized logistic regression analyses used to estimate the networks)
+no_BE_network_bootnet$results # weights matrix and intercepts
+no_BE_network_bootnet$labels # variable labels
+no_BE_network_bootnet$nNodes # number of nodes in network
+no_BE_network_bootnet$nPerson # number of persons in network
+```
+
+### no_BE centrality estimates
+```{r centrality estimates no_BE}
+# Raw centrality measures (not standardised)
+qgraph::centrality(no_BE_network_bootnet)
+
+# Standardised centrality estimates [node strength]
+plot(qgraph::centrality(no_BE_network_bootnet)$InDegree,
+     type = "b") 
+
+# Standardised centrality estimated for four centrality indices
+qgraph::centralityTable(no_BE_network_bootnet,
+                        labels = longnames)
+
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_centrality_plot_no_BE.png"))
+
+qgraph::centralityPlot(no_BE_network_bootnet,
+               include ="all",
+               labels = longnames) 
+
+dev.off()
+```
+
+### no_BE Edge weight accuracy
+Use the bootnet() function to estimate edge weight accuracy and centrality stability and plot them
+See: Estimating psychological networks and their accuracy: A tutorial paper
+Bootstrapping = picking people with replacement, i.e. each sample will have a different composition of people (e.g. choosing a random 70% of the sample each time)
+```{r edge weight accuracy no_BE network}
+edge_accuracy_no_BE_network <- bootnet(no_BE_network_bootnet,
+                                     nBoots = 1000, 
+                                     nCores = 4,
+                                     statistics = c("edge", 
+                                                    "strength",
+                                                    "betweenness",
+                                                    "closeness",
+                                                    "expectedInfluence"),
+                                     labels = shortnames
+                                     ) 
+
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_edge_accuracy_plot_no_BE.png"))
+
+plot(edge_accuracy_no_BE_network,
+                                      #plot = "interval",
+                                      # split0 = TRUE,
+                                      order = "sample",
+                                       labels = TRUE)
+
+dev.off()
+
+edge_accuracy_no_BE_network_plot <- plot(edge_accuracy_no_BE_network,
+                                      #plot = "interval",
+                                      # split0 = TRUE,
+                                      order = "sample",
+                                       labels = TRUE)
+
+dev.off()
+
+edge_accuracy_no_BE_network_plot
+
+
+# This function makes a ’multiverse’ plot of bootstrap results. Every row indicates an edge and every column a bootstrap; colors are in line of the edge strength as drawn with plot.bootnetResult.
+#multiverse(edge_accuracy_no_BE_network_plot,
+#           labels = T) 
+```
+
+### no_BE centrality accuracy
+```{r centrality accuracy no_BE network}
+centrality_stability_no_BE_network <- bootnet(no_BE_network_bootnet,
+                                nBoots = 1000, 
+                                nCores = 1,
+                                type = "case", #case-dropping bootstrap
+                                statistics = c("closeness",
+                                               "strength",
+                                               "betweenness",
+                                               "expectedInfluence")) 
+
+centrality_stability_no_BE_network
+
+# Table of all statistics from original sample 
+centrality_stability_no_BE_network$sampleTable 
+
+# Results of bootstrap
+centrality_stability_no_BE_network$boots
+
+# Table of all statistics from bootstraps
+centrality_stability_no_BE_network$bootTable
+
+# Plot centrality stability
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_centrality_stability_plot_no_BE.png"))
+
+plot(centrality_stability_no_BE_network,
+     statistics = "expectedInfluence")
+
+dev.off()
+
+centrality_stability_no_BE_network_plot <- plot(centrality_stability_no_BE_network,
+                                                statistics = c("closeness",
+                                                             "strength",
+                                                             "betweenness",
+                                                             "expectedInfluence"))
+centrality_stability_no_BE_network_plot
+
+
+# CS-coefficient (to quantify the centrality stability)
+corStability(centrality_stability_no_BE_network,
+              cor = 0.7,
+              statistics = "all")
+```
+
+### Test significance of differences (between edge weights and node centralities) to test for differences within a single network 
+Significance: Specific edge weights 
+```{r test significance of differences of specific edge weight no_BE network}
+# Plot significant differences (alpha = 0.05) of edge weights:
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_sig_diff_edges_plot_no_BE.png"))
+
+plot(edge_accuracy_no_BE_network,
+     "edge",
+     plot = "difference",
+     onlyNonZero = TRUE,
+     order = "sample",
+     labels = TRUE
+     )
+
+dev.off()
+```
+
+Significance: Node centralities
+```{r test significance of differences of node centralities no_BE network}
+# Plot significant differences (alpha = 0.05) of node centrality eg. strength for all nodes:
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_sig_diff_centrality_plot_no_BE.png"))
+
+plot(edge_accuracy_no_BE_network,
+     "expectedInfluence",
+     plot = "difference",
+     order = "sample"
+     ) # Note: use edge accuracy estimates for this as centrality is a measure of connecting edges
+
+dev.off()
+# Test for difference in strength between specific nodes - perhaps more useful if you have apriori reason to explore specific differents in nodes
+# Eg. difference in centrality between ene and expectedInfluence for strength 
+# differenceTest(edge_accuracy_ED_network,  "ene", "rac", "expectedInfluence")
+```
+
+### Average layout
+Calculate average layout of 2 networks to then constrain them all to that layout (don't use Fruchterman-Reingold)
+```{r calculating average layout symptom data}
+average_layout <- qgraph::averageLayout(BE_network_plot,
+                                no_BE_network_plot)
+```
+
+Re-plot each using 'average_layout'
+```{r re-plot each using average layout symptom data}
+# BE
+BE_network_plot <- qgraph::qgraph(BE_network$pairwise$wadj, # weighted adjacency matrix as input
+       layout = average_layout, 
+       pie = error_list_BE, # provide errors as input
+       pieColor = color_list,
+       edge.color = "blue3",
+       cut = 0, 
+       labels = shortnames,
+       nodeNames = longnames,
+       groups =  BEcommunities,
+       palette = "colorblind",
+       color = c("orange",
+                 "light blue",
+                 "red",
+                 "grey" # covariates in grey
+                 ),
+       label.scale = T,
+       title = "Network of mania symptoms in BE sample,
+                   n = 825",
+       filetype = "png",
+       filename = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_network_BE_average_layout"),
+       width = 10,
+       height = 10
+      )
+
+# No BE
+no_BE_network_plot <- qgraph::qgraph(no_BE_network$pairwise$wadj, # weighted adjacency matrix as input
+       layout = average_layout, 
+       pie = error_list_no_BE, # provide errors as input
+       pieColor = color_list,
+       edge.color = "blue3",
+ 
+       labels = shortnames,
+       nodeNames = longnames,
+       groups =  no_BEcommunities,
+       palette = "colorblind",
+       color = c("grey", # covariates in grey
+                  "orange",
+                 "light blue"
+                 
+                 ),
+       label.scale = T,
+       title = "Network of mania symptoms in no BE sample,
+                   n = 825",
+       filetype = "png",
+       filename = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_network_no_BE_average_layout"),
+       width = 10,
+       height = 10
+      )
+```
+
+# SYMPTOM LEVEL- COMPARING NETWORKS
+## BE vs no BE
+### 1. Correlation of the weighted adjacency matrix of both models: Age and sex included versus not
+```{r BE vs no BE correlation of weighted adjacency matrices}
+# Drop age and sex from adjacency matrices
+BE_network_no_age_sex <- tril(BE_network_bootnet$graph) 
+BE_network_no_age_sex <- BE_network_no_age_sex[-c(14,15),-c(14,15)]
+diag(BE_network_no_age_sex) <- NA_real_
+BE_network_no_age_sex <- as.vector(BE_network_no_age_sex)
+
+no_BE_network_no_age_sex <- tril(no_BE_network_bootnet$graph) 
+no_BE_network_no_age_sex <- no_BE_network_no_age_sex[-c(14,15),-c(14,15)]
+diag(no_BE_network_no_age_sex) <- NA_real_
+no_BE_network_no_age_sex <- as.vector(no_BE_network_no_age_sex)
+
+corr_no_age_sex <- cor.test(x=BE_network_no_age_sex,
+                 y=no_BE_network_no_age_sex,
+                 method = 'spearman')
+
+corr_no_age_sex # 0.9
+corr_no_age_sex$p.value # 2.258412e-60
+```
+
+### 2. Absolute sum of adjacency matrices for the two networks [edge weights]
+```{r BE vs no BE absolute sum of adjacency matrices}
+sum(abs(na.omit(BE_network_no_age_sex))) 
+sum(abs(na.omit(no_BE_network_no_age_sex)))
+```
+
+### 3. Compare centrality
+```{r BE vs no BE compare centrality}
+# Plot centrality differences
+sens_BE_vs_no_BE_centrality_plot <- centralityPlot(list( "Binge eating" = BE_network_bootnet,
+               "No binge eating" = no_BE_network_bootnet),
+               include = "ExpectedInfluence",
+               orderBy = "ExpectedInfluence",
+               labels = longnames)
+
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/centrality_diff_BE_vs_no_BE.png"))
+
+sens_BE_vs_no_BE_centrality_plot + labs(x = "Centrality indices",
+            y = "Nodes",
+            colour = "Comparison group")
+
+dev.off()
+```
+
+### 4. Compare networks using the Network Comparison Test
+```{r BE vs no BE compare centrality Network Comparison Test}
+# Use output from estimatenetwork as data, that way specific settings eg. model and tuning are retained
+networkcomparison_BE_no_BE <- NCT(BE_network_bootnet,
+                         no_BE_network_bootnet,
+                         it = 1000, 
+                         test.edges = T,
+                         edges=list(c(1,2), # List all edges other than age and sex
+                                    c(1,3),
+                                    c(1,4),
+                                    c(1,5),
+                                    c(1,6),
+                                    c(1,7),
+                                    c(1,8),
+                                    c(1,9),
+                                    c(1,10),
+                                    c(1,11),
+                                    c(1,12),
+                                    c(1,13),
+           
+                                    c(2,3),
+                                    c(2,4),
+                                    c(2,5),
+                                    c(2,6),
+                                    c(2,7),
+                                    c(2,8),
+                                    c(2,9),
+                                    c(2,10),
+                                    c(2,11),
+                                    c(2,12),
+                                    c(2,13),
+           
+                                    c(3,4),
+                                    c(3,5),
+                                    c(3,6),
+                                    c(3,7),
+                                    c(3,8),
+                                    c(3,9),
+                                    c(3,10),
+                                    c(3,11),
+                                    c(3,12),
+                                    c(3,13),
+           
+                                    c(4,5),
+                                    c(4,6),
+                                    c(4,7),
+                                    c(4,8),
+                                    c(4,9),
+                                    c(4,10),
+                                    c(4,11),
+                                    c(4,12),
+                                    c(4,13),
+                                    
+                                    c(5,6),
+                                    c(5,7),
+                                    c(5,8),
+                                    c(5,9),
+                                    c(5,10),
+                                    c(5,11),
+                                    c(5,12),
+                                    c(5,13),
+          
+          
+                                    c(6,7),
+                                    c(6,8),
+                                    c(6,9),
+                                    c(6,10),
+                                    c(6,11),
+                                    c(6,12),
+                                    c(6,13),
+           
+                                    c(7,8),
+                                    c(7,9),
+                                    c(7,10),
+                                    c(7,11),
+                                    c(7,12),
+                                    c(7,13),
+           
+                                    c(8,9),
+                                    c(8,10),
+                                    c(8,11),
+                                    c(8,12),
+                                    c(8,13),
+          
+                                    c(9,10),
+                                    c(9,11),
+                                    c(9,12),
+                                    c(9,13),
+           
+                                    c(10,11),
+                                    c(10,12),
+                                    c(10,13),
+           
+                                    c(11,12),
+                                    c(11,13),
+                                    
+                                    c(12,13)
+                         ), 
+           
+                         test.centrality = TRUE,
+                         centrality = c("closeness",
+                                        "betweenness",
+                                        "strength",
+                                        "expectedInfluence"),
+                         nodes = 1:13, # List all nodes other than age and sex
+                         p.adjust.methods = "bonferroni"
+                         )
+
+networkcomparison_BE_no_BE
+```
+
+### 5. Global strength: BE vs no BE differences 
+```{r BE vs no BE Network Comparison Test results - global strength}
+networkcomparison_BE_no_BE$glstrinv.sep # global strength of each network - adding up all the networks in each network, is there a difference?
+networkcomparison_BE_no_BE$glstrinv.real # difference in global strength
+networkcomparison_BE_no_BE$glstrinv.pval # significance of difference in global strength
+
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_global_strength_plot_BE_vs_no_BE.png"))
+
+plot(networkcomparison_BE_no_BE, what = "strength") # the results of the global strength test can be plotted
+
+dev.off()
+```
+
+### 6. Network structure: BE vs no BE differences 
+Results can also be plotted. The permutation test results in a reference distribution of test statistics under the relevant null hypothesis. NCT is accompanied by a plotting function  to visualizethe results. The red triangle indicates the test statistics based on the observed (real) data.
+IF 0, just say p < 0.001
+```{r BE vs no BE Network Comparison Test results - network structure}
+networkcomparison_BE_no_BE$nwinv.real # max difference in network structure
+networkcomparison_BE_no_BE$nwinv.pval # significance of difference in structure/organisation
+
+png(file = paste0(filepath_plots, "/revised_symptom/sensitivity_analysis/1a.Smallest_group/sens_network_structure_plot_BE_vs_no_BE.png"))
+
+plot(networkcomparison_BE_no_BE, # the results of the network structure test can be plotted
+     what = "network")
+
+dev.off()
+```
+
+### 6a. If significant - SPECIFIC EDGE WEIGHT DIFFERENCES 
+NB: When writing up, will need to refer back to the networks to see which edge weight was stronger and in which model. This only tells you if the difference was significant, not in which direction.
+```{r BE vs no BE Network Comparison Test results - specific edge weights}
+networkcomparison_BE_no_BE$einv.real # difference in edge weights of OBSERVED networks
+networkcomparison_BE_no_BE$einv.pvals # The Holm-Bonferroni corrected p values per edge from the permutation test concerning differences in edges weight
+networkcomparison_BE_no_BE$einv.perm # The values of the difference in edge weight of the permuted networks. Only iftest.edges =TRUE 
+# plot(networkcomparison_ANBP_BN, # The distribution(s) of the edge strength invariance test can be plotted
+ #    what="edge")
+
+edge_accuracy_no_BE_network$sampleTable # 0.53483441	# 0.50712811	# 1.74399732 # 0.58691867	
+edge_accuracy_BE_network$sampleTable # 0.311661625	# 0.208428875	# 1.268862060		# 0.221296324	# 0.221296324
+```
+
+### 7. Significant centrality differences
+```{r BE vs no BE Network Comparison Test results - significant differences centrality}
+networkcomparison_BE_no_BE$diffcen.real # The values of the difference in centralities of the OBSERVED networks. 
+networkcomparison_BE_no_BE$diffcen.perm # The values of the difference in centralities of the PERMUTED networks. 
+networkcomparison_BE_no_BE$diffcen.pval # p-values (corrected for multiple testing or not according to ’p.adjust.methods’) per node from the permutation test concerning differences in centralities. 
+```

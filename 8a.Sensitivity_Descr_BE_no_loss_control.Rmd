@@ -21,7 +21,7 @@ remove(list = ls())
 
 Read in file with path to data channel
 ```{r Read in file with path to data channel on teams}
-source(file = "../credentials/paths.R")
+source(file = "../../credentials/paths.R")
 ```
 
 Add the add_numeric function - used to convert character variables into numeric variables
@@ -69,7 +69,7 @@ date
 Read in data 
 ```{r Read in data}
 # Symptom dat
-symptom_dat <- readRDS(file = "../data/symptom_dat_analysis2022-03-15.rds")
+symptom_dat <- readRDS(file = "../../data/symptom_dat_analysis2022-03-15.rds")
 dim(symptom_dat)
 colnames(symptom_dat)
 
@@ -497,7 +497,7 @@ symptom_dat %>%
 
 ```{r create BE datasets}
 BE_loss_control <- symptom_dat %>%
-   filter(binge_eating_with_loss_control == "BE loss control") %>%
+   filter(binge_eating_with_loss_control == "Binge eating") %>%
   select(
    more_hyperactivity_numeric,
    more_irritability_numeric,
@@ -524,7 +524,7 @@ BE_loss_control <- symptom_dat %>%
 
 
 no_BE <- symptom_dat %>%
-   filter(binge_eating_with_loss_control == "No BE") %>%
+   filter(binge_eating_with_loss_control == "No binge eating") %>%
   select(
    more_hyperactivity_numeric,
    more_irritability_numeric,
@@ -550,7 +550,7 @@ no_BE <- symptom_dat %>%
   )
 
 BE_no_loss_control <- symptom_dat %>%
-   filter(binge_eating_with_loss_control == "BE no loss control") %>%
+   filter(binge_eating_with_loss_control == "Overeating") %>%
   select(
    more_hyperactivity_numeric,
    more_irritability_numeric,
@@ -750,13 +750,33 @@ symptom_dat_long %>%
   count(Mania_symptom,
         Endorsement)
 ```
+# Rename
+```{r revision rename}
+symptom_dat_long <- symptom_dat_long %>%
+  mutate(binge_eating_with_loss_control_renamed =
+           case_when(binge_eating_with_loss_control == "BE loss control" ~ "Binge eating",
+                     binge_eating_with_loss_control == "BE no loss control" ~ "Overeating",
+                     binge_eating_with_loss_control == "No BE" ~ "No binge eating/overeating"
+                     )) 
+
+symptom_dat_long <- symptom_dat_long %>%
+  mutate(binge_eating_with_loss_control_renamed_factor = factor(binge_eating_with_loss_control_renamed,
+                       levels = c("Binge eating",
+                         "Overeating",
+                         "No binge eating/overeating"
+                                  
+                                  
+                                  
+                                 )))
+
+```
 
 # Plot - response distribution for mania symptom variables in the sample
 Plotting percentage of each group reporting mania symptoms
 ```{r Mania symptom endorsement by eating disorder diagnoses,  fig.height=10, fig.width=10}
-png(file = paste0(filepath_plots, "/symptom/sensitivity_analysis/2.Be_no_loss_control/descriptives/mania_symptom_endorsement_symp.png",
+png(file = paste0(filepath_plots, "/revised_symptom/mania_symptom_endorsement_symp_",date,".png"),
     width = 800,
-    height = 800))
+    height = 800)
 
 symptom_dat_long %>% 
   mutate(
@@ -779,7 +799,7 @@ symptom_dat_long %>%
   ) %>%
   ggplot(
     aes(
-      y = binge_eating_with_loss_control,
+      y = binge_eating_with_loss_control_renamed_factor,
       fill = Endorsement
       )
     ) +
@@ -790,11 +810,12 @@ symptom_dat_long %>%
   theme(
     legend.position= "none",
     axis.title.y = element_blank(),
-     axis.title.x = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
     axis.text = element_text(size = 12),
     axis.text.x = element_text(size = 12), # size of percentages on x axis
-    strip.text = element_text(size = 13) # size of text in each facet
-) +
+    strip.text = element_text(size = 14, colour = "black"), # size of text in each facet
+    strip.background = element_rect(fill = "white", colour ="gray75"),
+    ) +
   scale_fill_manual(values=c(
     "gray75", "darkorchid2",
     "gray75", "darkorchid2"

@@ -21,7 +21,7 @@ remove(list = ls())
 
 Read in file with path to data channel
 ```{r Read in file with path to data channel on teams}
-source(file = "../credentials/paths.R")
+source(file = "../../credentials/paths.R")
 ```
 
 Add the add_numeric function - used to convert character variables into numeric variables
@@ -67,14 +67,14 @@ date
 
 ```{r load main environment}
 # Load environment from original analysis to get BED network (already 'pure'). Load now so necessary variables are saved over.
-load(paste0(filepath_own, "NetAnalEDMan/scripts/MainAnalysis_environment.RData"))
+load(paste0(filepath_own, "NetAnalEDMan/All_NetA_main.RData"))
 ```
 
 # Read in merged data with variables created
 Read in data 
 ```{r Read in data}
 # Diagnosis dat
-diagnosis_dat <- readRDS(file = "../data/diagnosis_dat_analysis2022-01-13.rds")
+diagnosis_dat <- readRDS(file = "../../data/diagnosis_dat_analysis2023-04-06.rds")
 dim(diagnosis_dat)
 colnames(diagnosis_dat)
 
@@ -319,28 +319,22 @@ ANBPCom <- igraph::cluster_walktrap(ANBPigraph)
 ANBPcommunities <- igraph::communities(ANBPCom)
 
 # Manually move age and sex into their own community (they are covariates. We estimated the groups first because we need the associations that have been adjusted for age and sex, but do not want them to form part of a group because they are not symptoms)
-ANBPcommunities$`4` <- c(14,
+ANBPcommunities$`3` <- c(14,
                         15)
 
-ANBPcommunities$`1`  <- c(10,
-                          11,
-                          12,
-                          13
-                        )
+ANBPcommunities$`4`  <- NULL
 
 
 # Rename clusters
-ANBPcommunities$`Cluster 1` <- ANBPcommunities$`1` 
-ANBPcommunities$`1`  <- NULL
-
-ANBPcommunities$`Cluster 2` <- ANBPcommunities$`2` 
+ANBPcommunities$`Cluster 1` <- ANBPcommunities$`2` 
 ANBPcommunities$`2`  <- NULL
 
-ANBPcommunities$`Cluster 3` <-ANBPcommunities$`3` 
+ANBPcommunities$`Cluster 2` <- ANBPcommunities$`1` 
+ANBPcommunities$`1`  <- NULL
+
+ANBPcommunities$`Covariates` <-ANBPcommunities$`3` 
 ANBPcommunities$`3`  <- NULL
 
-ANBPcommunities$`Covariates` <-ANBPcommunities$`4` 
-ANBPcommunities$`4`  <- NULL
 ```
 
 ### Plot ANBP network with walktrap algorithm AND predictability of nodes 
@@ -374,7 +368,7 @@ ANBP_network_plot <- qgraph::qgraph(ANBP_network$pairwise$wadj, # weighted adjac
        palette = "colorblind",
        label.scale = T,
        title = "Network of mania symptoms in ANBP sample,
-                   n = 450"
+                   n = 445"
       )
 ```
 
@@ -422,7 +416,7 @@ plot(qgraph::centrality(ANBP_network_bootnet)$InDegree,
 # Standardised centrality estimated for four centrality indices
 qgraph::centralityTable(ANBP_network_bootnet)
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_plot_ANBP.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_plot_ANBP_",date,".png"))
 
 qgraph::centralityPlot(ANBP_network_bootnet, # NB: For these plots, age and sex have to be included. Can't remove them.
                include ="all",
@@ -447,7 +441,7 @@ edge_accuracy_ANBP_network <- bootnet(ANBP_network_bootnet,
                                      labels = shortnames
                                      ) 
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_edge_accuracy_plot_ANBP.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_edge_accuracy_plot_ANBP_",date,".png"))
 
 plot(edge_accuracy_ANBP_network, 
                                       #plot = "interval",
@@ -492,7 +486,7 @@ centrality_stability_ANBP_network$boots
 # Table of all statistics from bootstraps
 centrality_stability_ANBP_network$bootTable
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_stability_plot_ANBP.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_stability_plot_ANBP_",date,".png"))
 
 # Plot centrality stability
 plot(centrality_stability_ANBP_network,
@@ -522,7 +516,7 @@ corStability(centrality_stability_ANBP_network,
 Significance: Specific edge weights
 ```{r test significance of differences of specific edge weight ANBP network}
 # Plot significant differences (alpha = 0.05) of edge weights:
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_edges_plot_ANBP.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_edges_plot_ANBP_",date,".png"))
 
 plot(edge_accuracy_ANBP_network,
      "edge",
@@ -538,7 +532,7 @@ dev.off()
 Significance: Node centralities
 ```{r test significance of differences of node centralities ANBP network}
 # Plot significant differences (alpha = 0.05) of node centrality eg. strength for all nodes:
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_node_centralities_plot_ANBP.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_node_centralities_plot_ANBP_",date,".png"))
 
 plot(edge_accuracy_ANBP_network,
      "expectedInfluence",
@@ -623,10 +617,9 @@ BNCom <- igraph::cluster_walktrap(BNigraph)
 BNcommunities <- igraph::communities(BNCom)
 
 # Manually move age and sex into their own community (they are covariates. We estimated the groups first because we need the associations that have been adjusted for age and sex, but do not want them to form part of a group because they are not symptoms)
-BNcommunities$`2`  <- c(12,
-                        13)
+BNcommunities$`2`  <- c(2,6,  7, 12, 13)
 
-BNcommunities$`5`  <- c(14,
+BNcommunities$`3`  <- c(14,
                         15)
 
 # Rename clusters
@@ -636,14 +629,8 @@ BNcommunities$`1`  <- NULL
 BNcommunities$`Cluster 2` <- BNcommunities$`2` 
 BNcommunities$`2`  <- NULL
 
-BNcommunities$`Cluster 3` <-BNcommunities$`3` 
+BNcommunities$`Covariates` <-BNcommunities$`3` 
 BNcommunities$`3`  <- NULL
-
-BNcommunities$`Cluster 4` <-BNcommunities$`4` 
-BNcommunities$`4`  <- NULL
-
-BNcommunities$`Covariates` <-BNcommunities$`5` 
-BNcommunities$`5`  <- NULL
 ```
 
 ### Plot BN network with walktrap algorithm AND predictability of nodes 
@@ -677,7 +664,7 @@ BN_network_plot <- qgraph::qgraph(BN_network$pairwise$wadj, # weighted adjacency
        palette = "colorblind",
        label.scale = T,
        title = "Network of mania symptoms in BN sample,
-                   n = 5385"
+                   n = 1,951"
       )
 ```
 
@@ -725,7 +712,7 @@ plot(qgraph::centrality(BN_network_bootnet)$InDegree,
 # Standardised centrality estimated for four centrality indices
 qgraph::centralityTable(BN_network_bootnet)
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_plot_BN.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_plot_BN_",date,".png"))
 
 qgraph::centralityPlot(BN_network_bootnet,
                include ="all",
@@ -750,7 +737,7 @@ edge_accuracy_BN_network <- bootnet(BN_network_bootnet,
                                      labels = shortnames
                                      ) 
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_edge_accuracy_plot_BN.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_edge_accuracy_plot_BN_",date,".png"))
 
 plot(edge_accuracy_BN_network,
                                       #plot = "interval",
@@ -796,7 +783,7 @@ centrality_stability_BN_network$boots
 centrality_stability_BN_network$bootTable
 
 # Plot centrality stability
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_stability_plot_BN.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_stability_plot_BN_",date,".png"))
 
 plot(centrality_stability_BN_network,
                                               statistics = c("closeness",
@@ -825,7 +812,7 @@ corStability(centrality_stability_BN_network,
 Significance: Specific edge weights
 ```{r test significance of differences of specific edge weight BN network}
 # Plot significant differences (alpha = 0.05) of edge weights:
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_edges_plot_BN.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_edges_plot_BN_",date,".png"))
 
 plot(edge_accuracy_BN_network,
      "edge",
@@ -841,7 +828,7 @@ dev.off()
 Significance: Node centralities
 ```{r test significance of differences of node centralities BN network}
 # Plot significant differences (alpha = 0.05) of node centrality eg. strength for all nodes:
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_node_centralities_plot_BN.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_node_centralities_plot_BN_",date,".png"))
 
 plot(edge_accuracy_BN_network,
      "expectedInfluence",
@@ -923,23 +910,13 @@ mixed_presentationCom <- igraph::cluster_walktrap(mixed_presentationigraph)
 mixed_presentationcommunities <- igraph::communities(mixed_presentationCom)
 
 # Manually move age and sex into their own community (they are covariates. We estimated the groups first because we need the associations that have been adjusted for age and sex, but do not want them to form part of a group because they are not symptoms)
-mixed_presentationcommunities$`1`  <- c(2,
+mixed_presentationcommunities$`2`  <- c(2,
                                         6,
                                         7,
+                                        12,
                                         13
                                         )
 
-
-mixed_presentationcommunities$`2` <- c(1,
-                                       3,
-                                       4,
-                                       5,
-                                       8,
-                                       9,
-                                       10,
-                                       11,
-                                       12
-                                       )
 
 mixed_presentationcommunities$`3`  <- c(14,
                                         15
@@ -988,7 +965,7 @@ mixed_presentation_network_plot <- qgraph::qgraph(mixed_presentation_network$pai
        palette = "colorblind",
        label.scale = T,
        title = "Network of mania symptoms in mixed_presentation sample,
-                   n = 2,746"
+                   n = 2,166"
       )
 ```
 
@@ -1037,7 +1014,7 @@ plot(qgraph::centrality(mixed_presentation_network_bootnet)$InDegree,
 qgraph::centralityTable(BED_network_bootnet,
                         labels = longnames)
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_plot_mixed_presentation.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_plot_mixed_presentation_",date,".png"))
 
 qgraph::centralityPlot(mixed_presentation_network_bootnet, # NB: For these plots, age and sex have to be included. Can't remove them.
                include ="all",
@@ -1062,7 +1039,7 @@ edge_accuracy_mixed_presentation_network <- bootnet(mixed_presentation_network_b
                                      labels = shortnames
                                      ) 
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_edge_accuracy_plot_mixed_presentation.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_edge_accuracy_plot_mixed_presentation_",date,".png"))
 
 plot(edge_accuracy_mixed_presentation_network, 
                                       #plot = "interval",
@@ -1107,7 +1084,7 @@ centrality_stability_mixed_presentation_network$boots
 # Table of all statistics from bootstraps
 centrality_stability_mixed_presentation_network$bootTable
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_stability_plot_mixed_presentation.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_stability_plot_mixed_presentation_",date,".png"))
 
 # Plot centrality stability
 plot(centrality_stability_mixed_presentation_network,
@@ -1137,7 +1114,7 @@ corStability(centrality_stability_mixed_presentation_network,
 Significance: Specific edge weights
 ```{r test significance of differences of specific edge weight mixed_presentation network}
 # Plot significant differences (alpha = 0.05) of edge weights:
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_edges_plot_mixed_presentation.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_edges_plot_mixed_presentation_",date,".png"))
 
 plot(edge_accuracy_mixed_presentation_network,
      "edge",
@@ -1153,7 +1130,7 @@ dev.off()
 Significance: Node centralities
 ```{r test significance of differences of node centralities mixed_presentation network}
 # Plot significant differences (alpha = 0.05) of node centrality eg. strength for all nodes:
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_node_centralities_plot_mixed_presentation.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_sig_diff_node_centralities_plot_mixed_presentation_",date,".png"))
 
 plot(edge_accuracy_mixed_presentation_network,
      "expectedInfluence",
@@ -1203,15 +1180,14 @@ ANBP_network_plot <- qgraph::qgraph(sens_ANBP_network$pairwise$wadj, # weighted 
        groups =  sens_ANBPcommunities,
        color = c("orange",
                  "light blue",
-                 "red",
                  "grey" # covariates in grey
                  ),
        palette = "colorblind",
        label.scale = T,
        title = "Sensitivity analysis ('pure' groups): Network of mania symptoms in ANBP sample,
-                   n = 450",
+                   n = 445",
        filetype = "png",
-       filename = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_ANBP_average_layout"),
+       filename = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_ANBP_average_layout"),
        width = 10,
        height = 10
       )
@@ -1229,15 +1205,13 @@ BN_network_plot <- qgraph::qgraph(sens_BN_network$pairwise$wadj, # weighted adja
        palette = "colorblind",
        color = c("orange",
                  "light blue",
-                 "red",
-                 "green",
                   "grey" # covariates in grey
                  ),
        label.scale = T,
        title = "Sensitivity analysis ('pure' groups): Network of mania symptoms in BN sample,
-                   n = 5385",
+                   n = 1951",
        filetype = "png",
-       filename = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_BN_average_layout"),
+       filename = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_BN_average_layout"),
        width = 10,
        height = 10
       )
@@ -1255,14 +1229,13 @@ BED_network_plot <- qgraph::qgraph(BED_network$pairwise$wadj, # weighted adjacen
        palette = "colorblind",
        color = c("orange",
                  "light blue",
-                 "red",
                   "grey" # covariates in grey
                  ),
        label.scale = T,
        title = "Sensitivity analysis ('pure' groups): Network of mania symptoms in BED sample,
-                   n = 1389",
+                   n = 3648",
        filetype = "png",
-       filename = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_BED_average_layout"),
+       filename = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_BED_average_layout"),
        width = 10,
        height = 10
       )
@@ -1284,9 +1257,9 @@ mixed_presentation_network_plot <- qgraph::qgraph(mixed_presentation_network$pai
                  ),
        label.scale = T,
        title = "Sensitivity analysis ('pure' groups): Network of mania symptoms in mixed presentation sample,
-                   n = 2,746",
+                   n = 2166",
        filetype = "png",
-       filename = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_mixed_presentation_average_layout"),
+       filename = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/network_mixed_presentation_average_layout"),
        width = 10,
        height = 10
       )
@@ -1330,7 +1303,7 @@ ANBP_vs_BN_centrality_plot <- centralityPlot(list( "Anorexia binge/purge" = ANBP
                orderBy = "ExpectedInfluence",
                labels = longnames)
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_ANBP_vs_BN.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_ANBP_vs_BN_",date,".png"))
 
 ANBP_vs_BN_centrality_plot + labs(x = "Centrality indices",
             y = "Nodes",
@@ -1464,7 +1437,7 @@ networkcomparison_ANBP_BN$glstrinv.sep # global strength of each network - addin
 networkcomparison_ANBP_BN$glstrinv.real # difference in global strength
 networkcomparison_ANBP_BN$glstrinv.pval # significance of difference in global strength
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_ANBP_vs_BN.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_ANBP_vs_BN_",date,".png"))
 
 plot(networkcomparison_ANBP_BN, what = "strength") # the results of the global strength test can be plotted
 
@@ -1478,7 +1451,7 @@ IF 0, just say p < 0.001
 networkcomparison_ANBP_BN$nwinv.real # max difference in network structure
 networkcomparison_ANBP_BN$nwinv.pval # significance of difference in structure/organisation
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_ANBP_vs_BN.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_ANBP_vs_BN_",date,".png"))
 
 plot(networkcomparison_ANBP_BN, # the results of the network structure test can be plotted
      what = "network")
@@ -1535,7 +1508,7 @@ ANBP_vs_BED_centrality_plot <- centralityPlot(list( "Anorexia binge/purge" = ANB
                orderBy = "ExpectedInfluence",
                labels = longnames)
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_ANBP_vs_BED.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_ANBP_vs_BED_",date,".png"))
 
 ANBP_vs_BED_centrality_plot + labs(x = "Centrality indices",
             y = "Nodes",
@@ -1661,7 +1634,7 @@ networkcomparison_ANBP_BED$glstrinv.sep # global strength of each network - addi
 networkcomparison_ANBP_BED$glstrinv.real # difference in global strength
 networkcomparison_ANBP_BED$glstrinv.pval # significance of difference in global strength
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_ANBP_vs_BED.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_ANBP_vs_BED_",date,".png"))
 
 plot(networkcomparison_ANBP_BED, what = "strength") # the results of the global strength test can be plotted
 
@@ -1675,7 +1648,7 @@ IF 0, just say p < 0.001
 networkcomparison_ANBP_BED$nwinv.real # max difference in network structure
 networkcomparison_ANBP_BED$nwinv.pval # significance of difference in structure/organisation
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_ANBP_vs_BED.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_ANBP_vs_BED_",date,".png"))
 
 plot(networkcomparison_ANBP_BED, # the results of the network structure test can be plotted
      what = "network")
@@ -1727,7 +1700,7 @@ BN_vs_BED_centrality_plot <- centralityPlot(list( "Bulimia" = BN_network_bootnet
                orderBy = "ExpectedInfluence",
                labels = longnames)
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_BN_vs_BED.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_BN_vs_BED_",date,".png"))
 
 BN_vs_BED_centrality_plot + labs(x = "Centrality indices",
             y = "Nodes",
@@ -1853,7 +1826,7 @@ networkcomparison_BN_BED$glstrinv.sep # global strength of each network - adding
 networkcomparison_BN_BED$glstrinv.real # difference in global strength
 networkcomparison_BN_BED$glstrinv.pval # significance of difference in global strength
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_BN_vs_BED.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_BN_vs_BED_",date,".png"))
 
 plot(networkcomparison_BN_BED, what = "strength") # the results of the global strength test can be plotted
 
@@ -1867,7 +1840,7 @@ IF 0, just say p < 0.001
 networkcomparison_BN_BED$nwinv.real # max difference in network structure
 networkcomparison_BN_BED$nwinv.pval # significance of difference in structure/organisation
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_BN_vs_BED.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_BN_vs_BED_",date,".png"))
 
 plot(networkcomparison_BN_BED, # the results of the network structure test can be plotted
      what = "network")
@@ -1931,7 +1904,7 @@ ANBP_vs_mixed_presentation_centrality_plot <- centralityPlot(list( "Anorexia bin
                orderBy = "ExpectedInfluence",
                labels = longnames)
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_ANBP_vs_mixed_presentation.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_ANBP_vs_mixed_presentation_",date,".png"))
 
 ANBP_vs_mixed_presentation_centrality_plot + labs(x = "Centrality indices",
             y = "Nodes",
@@ -2065,7 +2038,7 @@ networkcomparison_ANBP_mixed_presentation$glstrinv.sep # global strength of each
 networkcomparison_ANBP_mixed_presentation$glstrinv.real # difference in global strength
 networkcomparison_ANBP_mixed_presentation$glstrinv.pval # significance of difference in global strength
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_ANBP_vs_mixed_presentation.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_ANBP_vs_mixed_presentation_",date,".png"))
 
 plot(networkcomparison_ANBP_mixed_presentation, what = "strength") # the results of the global strength test can be plotted
 
@@ -2079,7 +2052,7 @@ IF 0, just say p < 0.001
 networkcomparison_ANBP_mixed_presentation$nwinv.real # max difference in network structure
 networkcomparison_ANBP_mixed_presentation$nwinv.pval # significance of difference in structure/organisation
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_ANBP_vs_mixed_presentation.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_ANBP_vs_mixed_presentation_",date,".png"))
 
 plot(networkcomparison_ANBP_mixed_presentation, # the results of the network structure test can be plotted
      what = "network")
@@ -2096,8 +2069,9 @@ networkcomparison_ANBP_mixed_presentation$einv.perm # The values of the differen
 # plot(networkcomparison_ANBP_mixed_presentation, # The distribution(s) of the edge strength invariance test can be plotted
  #    what="edge")
 
-edge_accuracy_ANBP_network$sampleTable
-edge_accuracy_mixed_presentation_network$sampleTable
+# more_talkative_numeric	racing_thoughts_numeric
+edge_accuracy_ANBP_network$sampleTable # 0.00000000
+edge_accuracy_mixed_presentation_network$sampleTable # 0.68244330	
 ```
 
 ### 7. Significant centrality differences
@@ -2139,7 +2113,7 @@ mixed_presentation_vs_BED_centrality_plot <- centralityPlot(list( "Anorexia bing
                orderBy = "ExpectedInfluence",
                labels = longnames)
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_mixed_presentation_vs_BED.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_mixed_presentation_vs_BED_",date,".png"))
 
 mixed_presentation_vs_BED_centrality_plot + labs(x = "Centrality indices",
             y = "Nodes",
@@ -2265,7 +2239,7 @@ networkcomparison_mixed_presentation_BED$glstrinv.sep # global strength of each 
 networkcomparison_mixed_presentation_BED$glstrinv.real # difference in global strength
 networkcomparison_mixed_presentation_BED$glstrinv.pval # significance of difference in global strength
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_mixed_presentation_vs_BED.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_mixed_presentation_vs_BED_",date,".png"))
 
 plot(networkcomparison_mixed_presentation_BED, what = "strength") # the results of the global strength test can be plotted
 
@@ -2279,7 +2253,7 @@ IF 0, just say p < 0.001
 networkcomparison_mixed_presentation_BED$nwinv.real # max difference in network structure
 networkcomparison_mixed_presentation_BED$nwinv.pval # significance of difference in structure/organisation
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_mixed_presentation_vs_BED.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_mixed_presentation_vs_BED_",date,".png"))
 
 plot(networkcomparison_mixed_presentation_BED, # the results of the network structure test can be plotted
      what = "network")
@@ -2341,7 +2315,7 @@ mixed_presentation_vs_BN_centrality_plot <- centralityPlot(list( "Mixed presenta
                orderBy = "ExpectedInfluence",
                labels = longnames)
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_mixed_presentation_vs_BN.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_centrality_diff_mixed_presentation_vs_BN_",date,".png"))
 
 mixed_presentation_vs_BN_centrality_plot + labs(x = "Centrality indices",
             y = "Nodes",
@@ -2475,7 +2449,7 @@ networkcomparison_mixed_presentation_BN$glstrinv.sep # global strength of each n
 networkcomparison_mixed_presentation_BN$glstrinv.real # difference in global strength
 networkcomparison_mixed_presentation_BN$glstrinv.pval # significance of difference in global strength
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_mixed_presentation_vs_BN.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_global_strength_plot_mixed_presentation_vs_BN_",date,".png"))
 
 plot(networkcomparison_mixed_presentation_BN, what = "strength") # the results of the global strength test can be plotted
 
@@ -2489,7 +2463,7 @@ IF 0, just say p < 0.001
 networkcomparison_mixed_presentation_BN$nwinv.real # max difference in network structure
 networkcomparison_mixed_presentation_BN$nwinv.pval # significance of difference in structure/organisation
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_mixed_presentation_vs_BN.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/sens_network_structure_plot_mixed_presentation_vs_BN_",date,".png"))
 
 plot(networkcomparison_mixed_presentation_BN, # the results of the network structure test can be plotted
      what = "network")
@@ -2524,7 +2498,7 @@ centralityplot <- centralityPlot(list("Anorexia nervosa binge-eating/purging (on
                                       orderBy = "ExpectedInfluence",
                                       labels = longnames)
 
-png(file = paste0(filepath_plots, "/diagnosis/sensitivity_analysis/2.Pure_ED_cases/centrality_diff_ANBP_BN_BED_sens_pure_ED_groups.png"))
+png(file = paste0(filepath_plots, "/revised_diagnosis/sensitivity_analysis/2.Pure_ED_cases/centrality_diff_ANBP_BN_BED_sens_pure_ED_groups_",date,".png"))
 
 centralityplot + 
    labs(x = "Centrality indices",

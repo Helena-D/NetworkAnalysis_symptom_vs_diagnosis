@@ -21,7 +21,7 @@ remove(list = ls())
 
 Read in file with path to data channel
 ```{r Read in file with path to data channel on teams}
-source(file = "../credentials/paths.R")
+source(file = "../../credentials/paths.R")
 ```
 
 Add the add_numeric function - used to convert character variables into numeric variables
@@ -49,17 +49,18 @@ We are using the recent date to save files with paste0() as an extension to not 
 date <- Sys.Date()
 date
 ```
+
 # Read in merged
 ```{r read in merged data}
-dat <- readRDS(file = paste0("../data/dat_merged_2022-03-15.rds"))
-dim(dat) # 97,387 people
+dat <- readRDS(file = paste0("../../data/dat_merged_2023-04-11.rds")) 
+dim(dat) 
 colnames(dat)
 ```
 
 First, drop the one of the pair of IDs (as decided in script 1a.GLAD_EDGI_duplicates) of people who took part twice. We have decided to keep people if they have ED100K data from EDGI. If not, then we will keep their GLAD data if they have GLAD COPING ED100K data or GLAD signup ED100K data. For those with none, we have kept their EDGI data (likely these people haven't finished any/many questionnaires).
 ```{r drop one ID for those who in both EDGI and GLAD}
 # Read in data with IDs to drop
-IDs_to_drop <- readRDS(file = paste0("../data/GLAD_EDGI_IDs_to_drop_dat_2021-11-30.rds"))
+IDs_to_drop <- readRDS(file = paste0("../../data/GLAD_EDGI_IDs_to_drop_dat_2023-04-05.rds")) 
 dim(IDs_to_drop)
 colnames(IDs_to_drop)
 
@@ -70,7 +71,7 @@ dat <- dat %>%
   filter(ID %!in% IDs_to_drop$GLAD_EDGI_IDs_to_drop)
 
 # Check that 881 data points were dropped (these people remain in the data set as they were duplicates)
-dim(dat) # 471 IDs dropped (remaining 410 must not form part of the data that I have merged together for my final dataset)
+dim(dat) 
 ```
 
 # Eating disorder diagnosis 
@@ -79,8 +80,7 @@ dim(dat) # 471 IDs dropped (remaining 410 must not form part of the data that I 
 dat <- dat %>%
   mutate(anorexia_nervosa_binge_purge =
            case_when(ed.DSM5_AN_binge_purge_binary_numeric == 1 |
-                      ed.DSM5_AN_binge_purge_binary_numeric_cop == 1 |
-                      an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging" ~ 1
+                      ed.DSM5_AN_binge_purge_binary_numeric_cop == 1  ~ 1
                       # Not in the mhd
                      )
    
@@ -90,18 +90,18 @@ dat <- dat %>%
 dat %>%
   freq(anorexia_nervosa_binge_purge)
 
-# Anorexia binge eating only
+# Anorexia with binge eating 
 dat <- dat %>%
-  mutate(anorexia_nervosa_binge_only =
-           case_when(ed.DSM5_AN_binge_only_binary_numeric == 1 |
-                      ed.DSM5_AN_binge_only_binary_numeric_cop == 1 ~ 1
+  mutate(anorexia_nervosa_with_binge =
+           case_when(ed.DSM5_AN_with_binge_binary_numeric == 1 |
+                      ed.DSM5_AN_with_binge_binary_numeric_cop == 1 ~ 1
                      )
    
          )
 
 # Check
 dat %>%
-  freq(anorexia_nervosa_binge_only)
+  freq(anorexia_nervosa_with_binge)
 
 # Anorexia purging only
 dat <- dat %>%
@@ -192,17 +192,6 @@ dat %>%
 
 For Descriptives: Self-reported eating disorder diagnosis versus DSM-5 algorithm-derived diagnosis 
 ```{r descriptives}
-# Self-report: Anorexia binge-eating/purging
-dat <- dat %>%
-  mutate(anorexia_nervosa_binge_purge_self_report =
-           case_when( an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging" ~ 1
-               )
-         )
-
-# Check
-dat %>%
-  freq(anorexia_nervosa_binge_purge_self_report)
-
 # Algorithm-derived: Anorexia binge-eating/purging
 dat <- dat %>%
   mutate(anorexia_nervosa_binge_purge_algorithm_derived =
@@ -263,6 +252,10 @@ dat <- dat %>%
                        ed.DSM5_BED_binary_numeric_cop == 1 ~ 1
                      )
          )
+
+# Check
+dat %>%
+  freq(binge_eating_disorder_algorithm_derived)
 ```
 
 Hierarchical categorisation of eating disorder diagnoses
@@ -296,7 +289,7 @@ dat %>%
 # Hierarchical categorisation: sensitivity analysis
 dat <- dat %>%
   mutate(ED_hierarchical_sens_ANB =
-           case_when(anorexia_nervosa_binge_only == 1 ~ "Anorexia binge eating only",
+           case_when(anorexia_nervosa_with_binge == 1 ~ "Anorexia with binge eating",
                      bulimia_nervosa == 1 ~ "Bulimia nervosa",
                      binge_eating_disorder == 1 ~ "Binge-eating disorder"
                      )
@@ -309,9 +302,9 @@ dat %>%
 # Hierarchical categorisation numeric: sensitivity analysis
 dat <- dat %>%
   mutate(ED_hierarchical_sens_ANB_numeric =
-           case_when(ED_hierarchical == "Anorexia binge eating only" ~ 2,
-                     ED_hierarchical == "Bulimia nervosa" ~ 1,
-                     ED_hierarchical == "Binge-eating disorder" ~ 0
+           case_when(ED_hierarchical_sens_ANB == "Anorexia with binge eating" ~ 2,
+                     ED_hierarchical_sens_ANB == "Bulimia nervosa" ~ 1,
+                     ED_hierarchical_sens_ANB == "Binge-eating disorder" ~ 0
                      )
          )
 
@@ -452,21 +445,19 @@ dat %>%
   freq(racially_minoritised)
 ```
 
-# Select relevant variables (for variables that can change) hal here
-```{r}
+# Select relevant variables (for variables that can change) 
+```{r select variables that change}
 dat_diagnostic_crossover <- dat %>%
  filter(
         (
           (ed.DSM5_BED_binary_numeric == 1 |
-          an.1.bingeeating_disorder == 1 |
+          an.1.bingeeating_disorder_numeric == 1 |
           mhd.bed_numeric == 1) & # Has BED in GLAD or EDGI UK (sign-up)
           
           ((ed.DSM5_AN_binge_purge_binary_numeric == 0 |
           is.na(ed.DSM5_AN_binge_purge_binary_numeric)) &
             (ed.DSM5_BN_binary_numeric == 0 |
           is.na(ed.DSM5_BN_binary_numeric)) &
-            (an.1.anorexia_nervosa_binge_purge == "Not Anorexia binge-eating/purging" |
-          is.na(an.1.anorexia_nervosa_binge_purge)) &
             (an.1.bulimia_nervosa_numeric == 0 |
           is.na(an.1.bulimia_nervosa_numeric)) &
             (mhd.bn_numeric == 0 |
@@ -480,7 +471,7 @@ dat_diagnostic_crossover <- dat %>%
 dat_diagnostic_crossover2 <- dat %>%
  filter(
         (((ed.DSM5_BED_binary_numeric == 1 |
-          an.1.bingeeating_disorder == 1 |
+          an.1.bingeeating_disorder_numeric == 1 |
           mhd.bed_numeric == 1) | 
            
           (ed.DSM5_BN_binary_numeric == 1 |
@@ -488,9 +479,7 @@ dat_diagnostic_crossover2 <- dat %>%
            mhd.bn_numeric == 1)) & # Has BED or BN in GLAD or EDGI UK (sign-up)
            
          ((ed.DSM5_AN_binge_purge_binary_numeric == 0 |
-          is.na(ed.DSM5_AN_binge_purge_binary_numeric)) &
-            (an.1.anorexia_nervosa_binge_purge == "Not Anorexia binge-eating/purging" |
-          is.na(an.1.anorexia_nervosa_binge_purge)))) & # Does not have ANBP in GLAD or EDGI UK (sign-up)
+          is.na(ed.DSM5_AN_binge_purge_binary_numeric)))) & # Does not have ANBP in GLAD or EDGI UK (sign-up)
    
          ed.DSM5_AN_binge_purge_binary_numeric_cop == 1 
         ) # Has ANBP in COPING
@@ -503,7 +492,7 @@ dat_diag_cross_check <- dat_diag_cross_check %>%
   mutate(BED_in_GLAD_EDGI =
            case_when(
               ed.DSM5_BED_binary_numeric == 1 |
-          an.1.bingeeating_disorder == 1 |
+          an.1.bingeeating_disorder_numeric == 1 |
           mhd.bed_numeric == 1~ 1))
 
 dat_diag_cross_check <- dat_diag_cross_check %>%
@@ -528,8 +517,7 @@ dat_diag_cross_check <- dat_diag_cross_check %>%
 dat_diag_cross_check <- dat_diag_cross_check %>%
   mutate(ANBP_in_GLAD_EDGI =
            case_when(
-              ed.DSM5_AN_binge_purge_binary_numeric == 1 |
-               an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging"  ~ 1))
+              ed.DSM5_AN_binge_purge_binary_numeric == 1  ~ 1))
 
 dat_diag_cross_check <- dat_diag_cross_check %>%
   mutate(ANBP_in_COPING =
@@ -547,7 +535,7 @@ dat_diag_cross_check %>%
 
 
 # Check number of people in final file
-symptom_dat <- readRDS(file = "../data/symptom_dat_analysis2022-03-15.rds")
+symptom_dat <- readRDS(file = "../../data/symptom_dat_analysis2022-03-15.rds")
 
 dat_diag_cross_check <- dat_diag_cross_check %>%
   filter(ID %in% symptom_dat$ID)
@@ -555,8 +543,7 @@ dat_diag_cross_check <- dat_diag_cross_check %>%
 # How many of these people are in the ANBP group?
 dat_diag_cross_check_ANBP <- dat_diag_cross_check %>%
   filter(ed.DSM5_AN_binge_purge_binary_numeric_cop == 1 |
-           ed.DSM5_AN_binge_purge_binary_numeric == 1 |
-           an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging") # 82 people with ANBP
+           ed.DSM5_AN_binge_purge_binary_numeric == 1 ) # 82 people with ANBP
 
 # How many of these people are in the BN group?
 dat_diag_cross_check %>%
@@ -604,11 +591,6 @@ dat_diag_cross_check_table <- dat_diag_cross_check %>%
 
 ```
 
-
-
-
-
-
 ## First, depending on diagnosis
 NB: We will lose people who took part in EDGI or GLAD sign-up but did not meet criteria for one of the EDs specified and then also did not take part in COPING. However, this is fine because we are comparing across ANBP, BED, and BN (and therefore people who do not fit one of these diagnoses would be dropped anyway). The 'TRUE' is assigning EVERYONE else their variable at COPING, however we will only end up keeping the participants who also then met diagnostic criteria in COPING for one of these disorders.
 
@@ -623,10 +605,9 @@ dat <- dat %>%
              (ed.DSM5_AN_binge_purge_binary_numeric == 1 | 
                 ed.DSM5_BN_binary_numeric == 1 | 
                 ed.DSM5_BED_binary_numeric == 1 |
-                an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging" |
                 an.1.bulimia_nervosa_numeric == 1 |
                 mhd.bn_numeric == 1 |
-                an.1.bingeeating_disorder == 1 |
+                an.1.bingeeating_disorder_numeric == 1 |
                 mhd.bed_numeric == 1) ~ "BE disorder at sign-up", # The only people we need to assign different variables for are people who met criteria at GLAD or EDGI sign-up FIRST. Otherwise, for everyone else, we will use their variables at COPING (if available, otherwise will use GLAD/EDGI). 
              
              )
@@ -635,6 +616,43 @@ dat <- dat %>%
 # Check 
 dat %>%
   freq(binge_eating_disorder_timing)
+
+# Hierarchically for lowest BMI
+dat <- dat %>%
+  mutate(binge_eating_disorder_timing_hierarchy = 
+           case_when(
+             
+             # GLAD or EDGI sign-up
+             # ANBP reported (GLAD, EDGI)
+             ed.DSM5_AN_binge_purge_binary_numeric == 1 ~ "GLAD/EDGI",
+             
+            # ANBP reported (NBR)
+             ed.DSM5_AN_binge_purge_binary_numeric_cop == 1  ~ "NBR",
+            
+            # BN reported (GLAD, EDGI) 
+            ed.DSM5_BN_binary_numeric== 1 |
+             an.1.bulimia_nervosa_numeric == 1 |
+              mhd.bn_numeric ==1 ~ "GLAD/EDGI",
+            
+             # BN reported (NBR) 
+            ed.DSM5_BN_binary_numeric_cop == 1 |
+            mhd.bn_cop_numeric== 1 ~ "NBR",
+             
+            # BED reported (GLAD, EDGI) 
+           an.1.bingeeating_disorder_numeric == 1 |
+           mhd.bed_numeric == 1 |
+           ed.DSM5_BED_binary_numeric == 1 ~ "GLAD/EDGI",
+   
+           # BED reported (NBR) 
+            mhd.bed_cop_numeric == 1 |
+          ed.DSM5_BED_binary_numeric_cop == 1 ~ "NBR"
+          ))
+          
+            
+# Check 
+dat %>%
+  freq(binge_eating_disorder_timing_hierarchy)
+
 
 # BMI signup
 dat <- dat %>%
@@ -667,42 +685,43 @@ dat %>%
   filter(is.na(bmi_signup_dx_level)) %>%
   freq(dem.bmi_signup)
 
-# Lowest BMI (would rather lowest BMI at ANY height [dem.bmi_an_lowest/dem.bmi_an_lowest_cop], than their lowest BMI at adult height if poss [dem.bmi_lowest/dem.bmi_lowest_cop])
+# Lowest BMI (would rather lowest BMI at ANY height [dem.bmi_an_lowest/dem.bmi_an_lowest_cop], than their lowest BMI at adult height if poss [dem.bmi_lowest/dem.bmi_lowest_cop]). Here, I have used specific timing of disorder because the differences between the disorders is lowest BMI.
 dat <- dat %>%
   mutate(bmi_lowest_dx_level = 
            case_when(
-             binge_eating_disorder_timing == "BE disorder at sign-up" &  
+             binge_eating_disorder_timing_hierarchy == "GLAD/EDGI" &  
              !is.na(an.bmi_lowest) ~ an.bmi_lowest, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data (most desirable)
              
-             binge_eating_disorder_timing == "BE disorder at sign-up" &   
+              binge_eating_disorder_timing_hierarchy == "GLAD/EDGI" &   
              !is.na(dem.bmi_lowest) ~ dem.bmi_lowest, # People with GLAD/EDGI BE data and not missing for GLAD/EDGI variable data (second desirable)
              
-             is.na(binge_eating_disorder_timing) & 
+             binge_eating_disorder_timing_hierarchy == "NBR" & 
                !is.na(an.bmi_lowest_cop) ~ an.bmi_lowest_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data (most desirable)
              
-              is.na(binge_eating_disorder_timing) & 
+              binge_eating_disorder_timing_hierarchy == "NBR" &   
                !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop,  # People with no GLAD/EDGI BE data and not missing for COPING variable data (second desirable)
              
-             binge_eating_disorder_timing == "BE disorder at sign-up" & 
+             binge_eating_disorder_timing_hierarchy == "GLAD/EDGI" & 
                is.na(an.bmi_lowest) & 
                !is.na(dem.bmi_lowest) ~ dem.bmi_lowest, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data (missing most desirable)
              
-             binge_eating_disorder_timing == "BE disorder at sign-up" & 
-               is.na(dem.bmi_lowest) &
-               !is.na(an.bmi_lowest_cop) ~ an.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data (missing second most desirable)
-               binge_eating_disorder_timing == "BE disorder at sign-up" & 
-               is.na(an.bmi_lowest_cop) &
-               !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
-             
-              is.na(binge_eating_disorder_timing) & 
+            binge_eating_disorder_timing_hierarchy == "NBR" &   
                is.na(an.bmi_lowest_cop) &
                !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop, # People with no GLAD/EDGI BE data but missing for COPING variable data
             
-             is.na(binge_eating_disorder_timing) & 
+             binge_eating_disorder_timing_hierarchy == "GLAD/EDGI" & 
+               is.na(dem.bmi_lowest) &
+               !is.na(an.bmi_lowest_cop) ~ an.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data (missing second most desirable)
+               
+             binge_eating_disorder_timing_hierarchy == "GLAD/EDGI" & 
+               is.na(an.bmi_lowest_cop) &
+               !is.na(dem.bmi_lowest_cop) ~ dem.bmi_lowest_cop, # People with GLAD/EDGI BE data but missing for GLAD/EDGI variable data
+             
+              binge_eating_disorder_timing_hierarchy == "NBR" & 
                is.na(dem.bmi_lowest_cop) &
                !is.na(an.bmi_lowest) ~ an.bmi_lowest, # People with no GLAD/EDGI BE data but missing for COPING variable data
             
-              is.na(binge_eating_disorder_timing) & 
+               binge_eating_disorder_timing_hierarchy == "NBR" & 
                is.na(an.bmi_lowest) &
                !is.na(dem.bmi_lowest) ~ dem.bmi_lowest # People with no GLAD/EDGI BE data but missing for COPING variable data
             )
@@ -710,21 +729,13 @@ dat <- dat %>%
 
 # Check (people with ANY variable data should have a value in the newly-created variable)
 dat %>%
-  filter(is.na(bmi_lowest_dx_level)) %>%
-  freq(an.bmi_lowest)
-
-dat %>%
-  filter(is.na(bmi_lowest_dx_level)) %>%
-  freq(dem.bmi_lowest)
-
-dat %>%
-  filter(is.na(bmi_lowest_dx_level)) %>%
-  freq(an.bmi_lowest_cop)
-
-dat %>%
-  filter(is.na(bmi_lowest_dx_level)) %>%
-  freq(dem.bmi_lowest_cop)
-
+  filter(is.na(bmi_lowest_dx_level) &
+           !is.na(binge_eating_disorder_timing_hierarchy)) %>%
+  select(an.bmi_lowest,
+         an.bmi_lowest_cop,
+         dem.bmi_lowest,
+         dem.bmi_lowest_cop) %>%
+  descr()
 
 # Highest BMI
 dat <- dat %>%
@@ -1404,12 +1415,11 @@ dat <- dat %>%
                
               # Fulfilled criteria for binge-type ED in GLAD or EDGI sign-up
                (ed.DSM5_AN_binge_purge_binary_numeric == 1 |
-               an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging" |
                ed.DSM5_BN_binary_numeric == 1 |
                an.1.bulimia_nervosa_numeric == 1 |
                mhd.bn_numeric == 1 |
                ed.DSM5_BED_binary_numeric == 1 |
-               an.1.bingeeating_disorder == 1 |
+               an.1.bingeeating_disorder_numeric == 1 |
                mhd.bed_numeric == 1) ~ "BE at sign-up", # The only people we need to assign different variables for are people who met criteria at GLAD or EDGI sign-up FIRST. Otherwise, for everyone else, we will use their variables at COPING (if available). 
              
              # No binge eating reported in GLAD or EDGI sign-up and did not take part in COPING
@@ -2190,12 +2200,11 @@ dat <- dat %>%
                
               # Fulfilled criteria for binge-type ED in GLAD or EDGI sign-up
                (ed.DSM5_AN_binge_purge_binary_numeric == 1 |
-               an.1.anorexia_nervosa_binge_purge == "Anorexia binge-eating/purging" |
                ed.DSM5_BN_binary_numeric == 1 |
                an.1.bulimia_nervosa_numeric == 1 |
                mhd.bn_numeric == 1 |
                ed.DSM5_BED_binary_numeric == 1 |
-               an.1.bingeeating_disorder == 1 |
+               an.1.bingeeating_disorder_numeric == 1 |
                mhd.bed_numeric == 1) ~ "BE at sign-up", # The only people we need to assign different variables for are people who met criteria at GLAD or EDGI sign-up FIRST. Otherwise, for everyone else, we will use their variables at COPING (if available). 
              
              # Binge eating no loss of control in GLAD/EDGI only
@@ -2967,7 +2976,7 @@ dat %>%
 ```{r save dataset for analysis}
 dat %>% 
   saveRDS(
-    file = paste0("../data/dat_variables_", 
+    file = paste0("../../data/dat_variables_", 
     date, 
     ".rds"
     )

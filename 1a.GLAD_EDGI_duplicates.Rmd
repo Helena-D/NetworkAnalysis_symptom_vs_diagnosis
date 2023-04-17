@@ -22,7 +22,7 @@ remove(list = ls())
 
 Read in file with path to data channel
 ```{r Read in file with path to data channel on teams}
-source(file = "../credentials/paths.R")
+source(file = "../../credentials/paths.R")
 ```
 
 Add the add_numeric function - used to convert character variables into numeric variables
@@ -54,13 +54,13 @@ date
 
 # Read in duplicated people sheet
 ```{r read in duplicated people sheet}
-dup_people <- read_csv(file = paste0(filepath_own, "/duplicate_participant_report_2021_11_30_hashed.csv"))
+dup_people <- read_csv(file = paste0(filepath_Net_raw, "/duplicate_participant_report_2021_11_30_hashed.csv"))
 # 882 people
 ```
 
 Filter out people in main dataset with same ID
 ```{r}
-dat <- readRDS(file = paste0("../data/dat_merged_2021-11-30.rds"))
+dat <- readRDS(file = paste0("../../data/dat_merged_2023-04-05.rds"))
 dim(dat)
 colnames(dat)
 
@@ -90,7 +90,7 @@ EDGI_dat_ED100k <- same_people_EDGI_dat %>%
          !is.na(ed.DSM5_BED_binary_numeric) |
          !is.na(binge_eating)
            ) %>%
-  pull(ID) # 525 people (out of a total 882 EDGI IDs that I have in my data. Therefore, there are 357 people who have EDGI IDs but not EDGI ED100K data)
+  pull(ID) 
 
 # For these people, we want their GLAD ID (to check if they have done the GLAD ED100K)
 no_EDGI_dat_ED100k_GLAD_IDs <- dup_people %>%
@@ -108,7 +108,7 @@ GLAD_ED100K_check_cop <- same_people_GLAD_dat %>%
          !is.na(ed.DSM5_BED_binary_numeric_cop) |
          !is.na(binge_eating_cop))
            ) %>%
-  pull(ID) # 69 people
+  pull(ID) 
 
 # People people who have not filled out the EDGI ED100K - have they filled it out in GLAD?
 GLAD_ED100K_check <- same_people_GLAD_dat %>%
@@ -124,7 +124,7 @@ GLAD_ED100K_check <- same_people_GLAD_dat %>%
          !is.na(ed.DSM5_BED_binary_numeric) |
          !is.na(binge_eating))
            ) %>%
-  pull(ID) # 19 people
+  pull(ID) 
 
 # Merge GLAD IDs to keep (i.e., people who did not fill out the EDGI ED100K but did so in GLAD COPING or GLAD signup)
 GLAD_IDs_to_keep <- c(GLAD_ED100K_check_cop,
@@ -176,7 +176,7 @@ Export as data frame
 ```{r save as data frames}
 GLAD_EDGI_IDs_to_drop_dat %>% 
   saveRDS(
-    file = paste0("../data/GLAD_EDGI_IDs_to_drop_dat_", 
+    file = paste0("../../data/GLAD_EDGI_IDs_to_drop_dat_", 
     date, 
     ".rds"
     )
@@ -184,7 +184,7 @@ GLAD_EDGI_IDs_to_drop_dat %>%
 
 GLAD_EDGI_IDs_to_keep_dat %>% 
   saveRDS(
-    file = paste0("../data/GLAD_EDGI_IDs_to_keep_dat_", 
+    file = paste0("../../data/GLAD_EDGI_IDs_to_keep_dat_", 
     date, 
     ".rds"
     )
